@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sentinel Dock</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        button { margin: 5px; }
+        pre { background: #f4f4f4; padding: 10px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Sentinel Dock: Remote Monitoring and Vulnerability Scanning</h1>
+    <label>Docker Image/Container ID:</label>
+    <input type="text" id="input" placeholder="Enter image or container ID"><br><br>
+
+    <button onclick="execute('vulnerability_scan')">Vulnerability Scan</button>
+    <button onclick="execute('monitor')">Monitor Container</button>
+
+    <pre id="output"></pre>
+
+    <script>
+        async function execute(endpoint) {
+            const input = document.getElementById('input').value;
+            const response = await fetch('/' + endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ container_id: input, image_name: input })
+            });
+            const result = await response.json();
+            document.getElementById('output').textContent = JSON.stringify(result, null, 2);
+        }
+    </script>
+</body>
+</html>
