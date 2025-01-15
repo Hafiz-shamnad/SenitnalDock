@@ -19,11 +19,12 @@ def monitor():
     result = monitor_container(REMOTE_HOST, REMOTE_USER, REMOTE_PASS, container_id)
     return jsonify(result)
 
-@app.route('/vulnerability_scan', methods=['POST'])
+@app.route('/scanner', methods=['POST'])
 def vulnerability_scan():
     image_name = request.json.get('image_name')
     result = scan_image(REMOTE_HOST, REMOTE_USER, REMOTE_PASS, image_name)
     return jsonify(result)
+
 
 if __name__ == '__main__':
     app.run(debug=True)

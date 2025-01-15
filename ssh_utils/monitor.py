@@ -5,13 +5,13 @@ def monitor_container(host, username, password, container_id):
     if not client.connect():
         return {"success": False, "error": "Failed to connect to server."}
 
-    command = f"docker stats {container_id} --no-stream --format '{{{{json .}}}}'"
     try:
+        command = f"docker inspect {container_id}"
         output, error = client.execute(command)
         client.close()
         if error:
             return {"success": False, "error": error}
-        return {"success": True, "stats": output}
+        return {"success": True, "container_info": output}
     except Exception as e:
         client.close()
         return {"success": False, "error": str(e)}
