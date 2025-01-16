@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <script src="/static/js/scripts.js" defer></script>
+</head>
+<body>
+    <h1>Docker Monitoring Dashboard</h1>
+    <div id="metrics">
+        <p>CPU Usage: <span id="cpu"></span></p>
+        <p>Memory Usage: <span id="memory"></span></p>
+        <p>Running Containers: <span id="containers"></span></p>
+    </div>
+
+    <h2>Trivy Scan</h2>
+    <div>
+        <label for="image-name">Docker Image Name:</label>
+        <input type="text" id="image-name" placeholder="Enter image name (e.g., nginx)">
+        <button id="scan-image">Scan Image</button>
+    </div>
+
+    <div id="scan-results">
+        <h3>Scan Results</h3>
+        <pre id="scan-output">No scan performed yet.</pre>
+    </div>
+
+    <button id="generate-report">Generate CVE Report</button>
+</body>
+</html>
+
