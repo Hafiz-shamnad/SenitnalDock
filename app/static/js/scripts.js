@@ -33,13 +33,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Trigger report generation
     reportButton.addEventListener("click", async () => {
+        const scanOutputText = scanOutput.textContent;
+        if (!scanOutputText || scanOutputText.startsWith("Error") || scanOutputText === "Scanning...") {
+            alert("Run a successful scan first!");
+            return;
+        }
+
+        const cveList = JSON.parse(scanOutputText);
+
         try {
             const response = await fetch("/generate-report", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({ cve_list: {} }), // Add actual CVE list here
+                body: JSON.stringify({ cve_list: cveList }), // Pass actual CVE list
             });
 
             if (!response.ok) throw new Error("Failed to generate report.");
