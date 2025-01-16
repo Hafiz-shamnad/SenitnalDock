@@ -26,8 +26,14 @@ def generate_report_route():
     data = request.json
     cve_list = data.get('cve_list', {})
 
+    if not cve_list:
+        return jsonify({'error': 'No CVE list provided'}), 400
+
+    print("Received CVE list:", cve_list)  # Debugging line
+
     try:
         pdf_path = generate_report(cve_list)
         return jsonify({'message': 'Report generated', 'pdf': pdf_path})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
