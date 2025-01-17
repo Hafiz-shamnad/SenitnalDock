@@ -1,8 +1,14 @@
 import subprocess
 import json
+import os
+import requests
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from fpdf import FPDF
+
+
+NVD_API_URL = "https://services.nvd.nist.gov/rest/json/cves"
+NVD_API_KEY = os.getenv("NVD_API_KEY")
 
 def run_trivy_scan(image_name):
     """
@@ -42,49 +48,74 @@ def run_trivy_scan(image_name):
 
 
 
-def generate_report(cve_list):
-    """
-    Generate a PDF report with CVE details.
-    Args:
-        cve_list (list): List of CVE details where each item is a dictionary.
-        Example: [{'cve_id': 'CVE-1234-5678', 'description': 'Some issue', 'mitigation': 'Apply patch'}]
-    Returns:
-        str: Path to the generated PDF file.
-    """
-    pdf_path = "cve_report.pdf"
+
+def get_mitigation(cve_id, api_key):
+    """Fetches details for a specific CVE ID from the NVD API."""
+    url = f"{NVD_API_URL}/2.0?cveId={cve_id}"
+    headers = {"apiKey": api_key}
 
     try:
-        # Create a canvas for the PDF
-        c = canvas.Canvas(pdf_path, pagesize=letter)
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+
+        # Extract CVE details
+        vulnerability = data["vulnerabilities"][0]["cve"]
+        descriptions = vulnerability.get("descriptions", [])
+        description = next((d["value"] for d in descriptions if d["lang"] == "en"), "No description available.")
+        metrics = vulnerability.get("metrics", {}).get("cvssMetricV31", [{}])[0]
+        impact_score = metrics.get("cvssData", {}).get("baseScore", "Not Available")
+        references = vulnerability.get("references", [])
+
+        # Format references into a single string
+        references_str = "\n".join(ref["url"] for ref in references)
+
+        return {
+            "CVE": vulnerability["id"],
+            "Description": description,
+            "Impact Score": impact_score,
+            "References": references_str,
+        }
+    except Exception as e:
+        print(f"Error fetching CVE details for {cve_id}: {e}")
+        return {
+            "CVE": cve_id,
+            "Description": "Error fetching data",
+            "Impact Score": "Not Available",
+            "References": "None",
+        }
+
+def generate_report(cve_details, output_path):
+    """Generates a PDF report with CVE details."""
+    try:
+        c = canvas.Canvas(output_path, pagesize=letter)
         width, height = letter
 
-        # Add a title
         c.setFont("Helvetica-Bold", 16)
-        c.drawString(50, height - 50, "CVE Report")
+        c.drawString(30, height - 50, "CVE Report")
+
+        y_position = height - 100
         c.setFont("Helvetica", 12)
 
-        # Add each CVE to the report
-        y_position = height - 100
-        for cve in cve_list:
-            if y_position < 100:  # Create a new page if space is insufficient
+        for cve in cve_details:
+            if y_position < 100:
                 c.showPage()
-                c.setFont("Helvetica", 12)
                 y_position = height - 50
+                c.setFont("Helvetica", 12)
 
-            cve_id = cve.get("cve_id", "N/A")
-            description = cve.get("description", "No description available")
-            mitigation = cve.get("mitigation", "No mitigation provided")
-
-            c.drawString(50, y_position, f"CVE ID: {cve_id}")
+            c.drawString(30, y_position, f"CVE: {cve['CVE']}")
+            y_position -= 15
+            c.drawString(30, y_position, f"Description: {cve['Description']}")
+            y_position -= 30
+            c.drawString(30, y_position, f"Impact Score: {cve['Impact Score']}")
+            y_position -= 15
+            c.drawString(30, y_position, "References:")
+            y_position -= 15
+            for line in cve['References'].split("\n"):
+                c.drawString(50, y_position, line)
+                y_position -= 15
             y_position -= 20
-            c.drawString(50, y_position, f"Description: {description}")
-            y_position -= 20
-            c.drawString(50, y_position, f"Mitigation: {mitigation}")
-            y_position -= 40
 
-        # Save the PDF
         c.save()
-        return pdf_path
     except Exception as e:
-        raise Exception(f"Error generating PDF: {str(e)}")
-
+        print(f"Error generating PDF: {e}")
