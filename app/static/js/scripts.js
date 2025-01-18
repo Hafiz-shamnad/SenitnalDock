@@ -1,3 +1,21 @@
+// WebSocket connection for real-time updates
+const socket = new WebSocket('ws://10.0.2.9:2375/containers/json');
+
+socket.on('update_metrics', (data) => {
+    const containerDiv = document.getElementById('containers');
+    containerDiv.innerHTML = '';
+    data.forEach(container => {
+        containerDiv.innerHTML += `
+            <div>
+                <p>Container: ${container.name}</p>
+                <p>CPU: ${container.cpu}</p>
+                <p>Memory: ${container.memory}</p>
+                <p>Status: ${container.status}</p>
+            </div>
+        `;
+    });
+});
+
 document.addEventListener("DOMContentLoaded", () => {
     const scanButton = document.getElementById("scan-image");
     const scanOutput = document.getElementById("scan-output");

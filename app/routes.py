@@ -1,7 +1,11 @@
 from flask import Blueprint, render_template, jsonify, request
 from app.utils import run_trivy_scan, generate_report , get_mitigation
+from flask import Flask, render_template, request, jsonify
+from flask_socketio import SocketIO
 import os
 
+app = Flask(__name__)
+socketio = SocketIO(app)
 main = Blueprint('main', __name__)
 
 NVD_API_KEY = os.getenv("NVD_API_KEY")
@@ -67,3 +71,5 @@ def generate_report_route():
     except Exception as e:
         return jsonify({'error': f"Failed to generate report: {e}"}), 500
 
+if __name__ == '__main__':
+    socketio.run(app, host='10.0.2.9', port=2375)

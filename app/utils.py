@@ -1,10 +1,19 @@
 import subprocess
 import json
 import os
+import threading
 import requests
+import psutil
+import docker
+import time
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from fpdf import FPDF
+from flask import Flask, render_template, request, jsonify
+from flask_socketio import SocketIO
+
+app = Flask(__name__)
+socketio = SocketIO(app)
 
 
 NVD_API_URL = "https://services.nvd.nist.gov/rest/json/cves"
@@ -119,3 +128,55 @@ def generate_report(cve_details, output_path):
         c.save()
     except Exception as e:
         print(f"Error generating PDF: {e}")
+        
+# --- System and Container Monitoring ---
+def get_system_stats():
+    return {
+        "cpu_usage": psutil.cpu_percent(interval=1),
+        "memory_usage": psutil.virtual_memory().percent,
+        "disk_usage": psutil.disk_usage('/').percent
+    }
+
+
+DOCKER_REMOTE_URL = 'http://10.0.2.9:2375'
+
+def get_container_stats():
+    try:
+        response = requests.get(f'{DOCKER_REMOTE_URL}/containers/json')
+        containers = response.json()
+        stats = []
+        for container in containers:
+            container_id = container['Id']
+            container_name = container['Names'][0]
+            stats_response = requests.get(f'{DOCKER_REMOTE_URL}/containers/{container_id}/stats?stream=false')
+            stats_data = stats_response.json()
+            stats.append({
+                'id': container_id,
+                'name': container_name,
+                'cpu': stats_data['cpu_stats']['cpu_usage']['total_usage'],
+                'memory': stats_data['memory_stats']['usage'],
+                'status': container['State']
+            })
+        return stats
+    except Exception as e:
+        print(f"Error fetching Docker stats: {e}")
+        return []
+
+
+
+@socketio.on('connect')
+def handle_connect():
+    def emit_metrics():
+        while True:
+            stats = get_container_stats()
+            socketio.emit('update_metrics', stats)
+            time.sleep(5)  # Emit every 5 seconds
+
+    threading.Thread(target=emit_metrics, daemon=True).start()
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    print("Client disconnected.")
+
+
+
