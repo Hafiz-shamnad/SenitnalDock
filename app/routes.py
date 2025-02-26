@@ -1,7 +1,12 @@
 from flask import Blueprint, render_template, jsonify, request
-from app.utils import run_trivy_scan, generate_report , get_mitigation
+from app.utils import run_trivy_scan, generate_report , get_mitigation , monitor_container
+from flask import Flask, render_template, request, jsonify
+from flask_socketio import SocketIO
+from flask_cors import CORS
 import os
 
+app = Flask(__name__, static_url_path='', static_folder='static')
+socketio = SocketIO(app, cors_allowed_origins="*")
 main = Blueprint('main', __name__)
 
 NVD_API_KEY = os.getenv("NVD_API_KEY")
@@ -9,6 +14,11 @@ NVD_API_KEY = os.getenv("NVD_API_KEY")
 @main.route('/')
 def home():
     return render_template('dashboard.html')
+
+@main.route('/monitor', methods=['GET'])
+def get_container_stats():
+    data = monitor_container()
+    return jsonify(data)
 
 
 @main.route('/scan', methods=['POST'])
@@ -67,3 +77,5 @@ def generate_report_route():
     except Exception as e:
         return jsonify({'error': f"Failed to generate report: {e}"}), 500
 
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)

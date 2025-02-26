@@ -1,10 +1,20 @@
 import subprocess
 import json
 import os
+import paramiko
 import requests
+import threading
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from fpdf import FPDF
+from flask import Flask
+from flask_socketio import SocketIO
+from flask import Flask, jsonify  # Add jsonify here
+
+
+
+app = Flask(__name__)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 
 NVD_API_URL = "https://services.nvd.nist.gov/rest/json/cves"
@@ -45,9 +55,6 @@ def run_trivy_scan(image_name):
         return cve_list
     except Exception as e:
         raise Exception(f"Error running Trivy: {str(e)}")
-
-
-
 
 def get_mitigation(cve_id, api_key):
     """Fetches details for a specific CVE ID from the NVD API."""
@@ -119,3 +126,53 @@ def generate_report(cve_details, output_path):
         c.save()
     except Exception as e:
         print(f"Error generating PDF: {e}")
+        
+# --- System and Container Monitoring ---
+SSH_HOST = "10.0.2.9"
+SSH_USER = "vboxuser"
+SSH_KEY = "~/.ssh/docker_monitoring_key"
+
+# Monitor Docker container stats using SSH and SSH key authentication
+def monitor_container():
+    try:
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(SSH_HOST, username=SSH_USER, key_filename=os.path.expanduser(SSH_KEY))
+
+        command = f"docker stats --no-stream --format '{{{{json .}}}}'"
+        stdin, stdout, stderr = ssh.exec_command(command)
+
+        stats_output = stdout.read().decode('utf-8')
+        error_output = stderr.read().decode('utf-8')
+
+        if error_output:
+            return {"error": error_output}
+        
+        if stats_output:
+            stats_json = [eval(line) for line in stats_output.strip().split("\n")]
+            return stats_json
+
+        return {"error": "No output from docker stats"}
+
+    except Exception as e:
+        return {"error": str(e)}
+
+    finally:
+        ssh.close()
+
+
+result = monitor_container()
+print(result)
+
+
+# def update_docker_stats():
+#     while True:
+#         monitor_container()
+#         socketio.sleep(5)  # Update stats every 5 seconds
+
+# def start_background_task():
+#     thread = threading.Thread(target=update_docker_stats)
+#     thread.daemon = True
+#     thread.start()
+
+
