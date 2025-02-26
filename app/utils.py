@@ -1,19 +1,20 @@
 import subprocess
 import json
 import os
-import threading
+import paramiko
 import requests
-import psutil
-import docker
-import time
+import threading
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from fpdf import FPDF
-from flask import Flask, render_template, request, jsonify
+from flask import Flask
 from flask_socketio import SocketIO
+from flask import Flask, jsonify  # Add jsonify here
+
+
 
 app = Flask(__name__)
-socketio = SocketIO(app)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 
 NVD_API_URL = "https://services.nvd.nist.gov/rest/json/cves"
@@ -54,9 +55,6 @@ def run_trivy_scan(image_name):
         return cve_list
     except Exception as e:
         raise Exception(f"Error running Trivy: {str(e)}")
-
-
-
 
 def get_mitigation(cve_id, api_key):
     """Fetches details for a specific CVE ID from the NVD API."""
@@ -130,53 +128,51 @@ def generate_report(cve_details, output_path):
         print(f"Error generating PDF: {e}")
         
 # --- System and Container Monitoring ---
-def get_system_stats():
-    return {
-        "cpu_usage": psutil.cpu_percent(interval=1),
-        "memory_usage": psutil.virtual_memory().percent,
-        "disk_usage": psutil.disk_usage('/').percent
-    }
+SSH_HOST = "10.0.2.9"
+SSH_USER = "vboxuser"
+SSH_KEY = "~/.ssh/docker_monitoring_key"
 
-
-DOCKER_REMOTE_URL = 'http://10.0.2.9:2375'
-
-def get_container_stats():
+# Monitor Docker container stats using SSH and SSH key authentication
+def monitor_container():
     try:
-        response = requests.get(f'{DOCKER_REMOTE_URL}/containers/json')
-        containers = response.json()
-        stats = []
-        for container in containers:
-            container_id = container['Id']
-            container_name = container['Names'][0]
-            stats_response = requests.get(f'{DOCKER_REMOTE_URL}/containers/{container_id}/stats?stream=false')
-            stats_data = stats_response.json()
-            stats.append({
-                'id': container_id,
-                'name': container_name,
-                'cpu': stats_data['cpu_stats']['cpu_usage']['total_usage'],
-                'memory': stats_data['memory_stats']['usage'],
-                'status': container['State']
-            })
-        return stats
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(SSH_HOST, username=SSH_USER, key_filename=os.path.expanduser(SSH_KEY))
+
+        command = f"docker stats --no-stream --format '{{{{json .}}}}'"
+        stdin, stdout, stderr = ssh.exec_command(command)
+
+        stats_output = stdout.read().decode('utf-8')
+        error_output = stderr.read().decode('utf-8')
+
+        if error_output:
+            return {"error": error_output}
+        
+        if stats_output:
+            stats_json = [eval(line) for line in stats_output.strip().split("\n")]
+            return stats_json
+
+        return {"error": "No output from docker stats"}
+
     except Exception as e:
-        print(f"Error fetching Docker stats: {e}")
-        return []
+        return {"error": str(e)}
+
+    finally:
+        ssh.close()
 
 
+result = monitor_container()
+print(result)
 
-@socketio.on('connect')
-def handle_connect():
-    def emit_metrics():
-        while True:
-            stats = get_container_stats()
-            socketio.emit('update_metrics', stats)
-            time.sleep(5)  # Emit every 5 seconds
 
-    threading.Thread(target=emit_metrics, daemon=True).start()
+# def update_docker_stats():
+#     while True:
+#         monitor_container()
+#         socketio.sleep(5)  # Update stats every 5 seconds
 
-@socketio.on('disconnect')
-def handle_disconnect():
-    print("Client disconnected.")
-
+# def start_background_task():
+#     thread = threading.Thread(target=update_docker_stats)
+#     thread.daemon = True
+#     thread.start()
 
 

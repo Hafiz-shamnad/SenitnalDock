@@ -1,25 +1,50 @@
-// WebSocket connection for real-time updates
-const socket = new WebSocket('ws://10.0.2.9:2375/containers/json');
-
-socket.on('update_metrics', (data) => {
-    const containerDiv = document.getElementById('containers');
-    containerDiv.innerHTML = '';
-    data.forEach(container => {
-        containerDiv.innerHTML += `
-            <div>
-                <p>Container: ${container.name}</p>
-                <p>CPU: ${container.cpu}</p>
-                <p>Memory: ${container.memory}</p>
-                <p>Status: ${container.status}</p>
-            </div>
-        `;
-    });
-});
-
 document.addEventListener("DOMContentLoaded", () => {
     const scanButton = document.getElementById("scan-image");
     const scanOutput = document.getElementById("scan-output");
     const reportButton = document.getElementById("generate-report");
+
+    async function fetchStats() {
+        try {
+            let response = await fetch('/monitor');
+            let data = await response.json();
+
+            if (data.error) {
+                document.getElementById('stats').innerHTML = `<p style="color: red;">Error: ${data.error}</p>`;
+                return;
+            }
+
+            let table = `<table border="1">
+                <tr>
+                    <th>Container</th>
+                    <th>CPU%</th>
+                    <th>Memory Usage</th>
+                    <th>Memory%</th>
+                    <th>Network I/O</th>
+                    <th>Block I/O</th>
+                    <th>PIDs</th>
+                </tr>`;
+
+            data.forEach(container => {
+                table += `<tr>
+                    <td>${container.Container}</td>
+                    <td>${container.CPUPerc}</td>
+                    <td>${container.MemUsage}</td>
+                    <td>${container.MemPerc}</td>
+                    <td>${container.NetIO}</td>
+                    <td>${container.BlockIO}</td>
+                    <td>${container.PIDs}</td>
+                </tr>`;
+            });
+
+            table += `</table>`;
+            document.getElementById('stats').innerHTML = table;
+        } catch (error) {
+            document.getElementById('stats').innerHTML = `<p style="color: red;">Error fetching data</p>`;
+        }
+    }
+
+    setInterval(fetchStats, 5000); // Refresh stats every 5 seconds
+    
 
     // Trigger Trivy scan
     scanButton.addEventListener("click", async () => {

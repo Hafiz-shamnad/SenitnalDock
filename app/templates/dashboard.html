@@ -1,16 +1,16 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Docker Monitoring Dashboard</title>
+    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
     <link rel="stylesheet" href="/static/css/styles.css">
     <script src="/static/js/scripts.js" defer></script>
 </head>
-<body>
-    <h1>Docker Monitoring Dashboard</h1>
-    <div id="metrics">
-        <p>CPU Usage: <span id="cpu"></span></p>
-        <p>Memory Usage: <span id="memory"></span></p>
-        <p>Running Containers: <span id="containers"></span></p>
-    </div>
+<body onload="fetchStats()">
+        <h1>Docker Monitoring Dashboard</h1>
+        <div id="stats">Loading...</div>
 
     <h2>Trivy Scan</h2>
     <div>
@@ -27,4 +27,3 @@
     <button id="generate-report">Generate CVE Report</button>
 </body>
 </html>
-
