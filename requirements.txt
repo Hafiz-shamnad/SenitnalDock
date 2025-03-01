@@ -2,3 +2,8 @@ flask
 flask-sqlalchemy
 fpdf
 requests
+paramiko
+flask-sock
+flask-socketio
+reportlab
+sock

@@ -1,24 +1,22 @@
 import subprocess
 import json
-import os
+import os , re
 import paramiko
 import requests
-import threading
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from fpdf import FPDF
 from flask import Flask
-from flask_socketio import SocketIO
-from flask import Flask, jsonify  # Add jsonify here
+from flask import Flask, jsonify 
 
 
 
 app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins="*")
 
 
 NVD_API_URL = "https://services.nvd.nist.gov/rest/json/cves"
 NVD_API_KEY = os.getenv("NVD_API_KEY")
+
 
 def run_trivy_scan(image_name):
     """
@@ -160,19 +158,64 @@ def monitor_container():
     finally:
         ssh.close()
 
+def get_running_containers():
+    """Fetch running Docker containers."""
+    try:
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(SSH_HOST, username=SSH_USER, key_filename=os.path.expanduser(SSH_KEY))
 
-result = monitor_container()
-print(result)
+        command = "docker ps --format '{{json .}}'"
+        stdin, stdout, stderr = ssh.exec_command(command)
 
+        output = stdout.read().decode('utf-8')
+        error_output = stderr.read().decode('utf-8')
 
-# def update_docker_stats():
-#     while True:
-#         monitor_container()
-#         socketio.sleep(5)  # Update stats every 5 seconds
+        ssh.close()
 
-# def start_background_task():
-#     thread = threading.Thread(target=update_docker_stats)
-#     thread.daemon = True
-#     thread.start()
+        if error_output:
+            return {"error": error_output}
 
+        if output:
+            containers = [eval(line) for line in output.strip().split("\n")]
+            return [{"ID": c["ID"], "Name": c["Names"], "Image": c["Image"]} for c in containers]
 
+        return {"error": "No running containers found"}
+
+    except Exception as e:
+        return {"error": str(e)}
+    
+def clean_logs(text):
+    """Remove ANSI escape codes and terminal sequences like cursor position requests."""
+    ansi_escape = re.compile(r'\x1B\[[0-9;]*[mK]|\x1B\[\?25[lh]|\x1B\[[0-9]*n|\r')
+    return ansi_escape.sub('', text)
+
+def fetch_logs(ws, container_name):
+    """Fetch Docker logs via SSH and stream them over WebSocket."""
+    try:
+        print(f"🔍 Connecting to SSH: {SSH_HOST} as {SSH_USER}")
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(SSH_HOST, username=SSH_USER, key_filename=os.path.expanduser(SSH_KEY))
+
+        json_data = container_name
+        container_id = json.loads(json_data)["container"]
+        command = f"docker logs -t --tail 50 --details {container_id}"
+        
+        stdin, stdout, stderr = ssh.exec_command(command)
+
+        # ✅ Use `ws.connected` instead of `ws.closed`
+        for line in iter(stdout.readline, ""):
+            if not ws.connected:  # Flask-SocketIO uses `connected`
+                break
+            log_line = line.strip()
+            ws.send(clean_logs(log_line))
+        ssh.close()
+
+    except paramiko.SSHException as e:
+        print(error_msg)
+        ws.send(error_msg)
+
+    except Exception as e:
+        print(error_msg)
+        ws.send(error_msg)

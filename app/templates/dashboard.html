@@ -4,26 +4,131 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Docker Monitoring Dashboard</title>
-    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+    <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+    <script src="/static/js/bootstrap.bundle.min.js"></script>
     <link rel="stylesheet" href="/static/css/styles.css">
     <script src="/static/js/scripts.js" defer></script>
+    
 </head>
-<body onload="fetchStats()">
-        <h1>Docker Monitoring Dashboard</h1>
-        <div id="stats">Loading...</div>
-
-    <h2>Trivy Scan</h2>
-    <div>
-        <label for="image-name">Docker Image Name:</label>
-        <input type="text" id="image-name" placeholder="Enter image name (e.g., nginx)">
-        <button id="scan-image">Scan Image</button>
+<body class="bg-light">
+    <nav class="navbar navbar-dark bg-dark p-3">
+        <a class="navbar-brand mx-3" href="#">Docker Monitoring Dashboard</a>
+    </nav>
+    
+    <div class="d-flex">
+        <!-- Sidebar -->
+        <div class="bg-dark text-white p-3 vh-100" style="width: 250px;">
+            <h5 class="text-center">Menu</h5>
+            <ul class="nav flex-column">
+                <li class="nav-item"><a href="#" class="nav-link text-white">Home</a></li>
+                <li class="nav-item"><a href="#stats" class="nav-link text-white">System Stats</a></li>
+                <li class="nav-item"><a href="#admin" class="nav-link text-white">Admin Controls</a></li>
+                <li class="nav-item"><a href="#scan" class="nav-link text-white">Trivy Scan</a></li>
+                <li class="nav-item"><a href="#logs" class="nav-link text-white">System Logs</a></li>
+                <li class="nav-item"><a href="#settings" class="nav-link text-white">Settings</a></li>
+            </ul>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="container mt-4" style="flex-grow: 1;">
+            <div class="row">
+                <div class="col-lg-6">
+                    <div class="card shadow-sm" id="scan">
+                        <div class="card-body">
+                            <h5 class="card-title">Trivy Scan</h5>
+                            <div class="mb-3">
+                                <label for="image-name" class="form-label">Docker Image Name</label>
+                                <input type="text" class="form-control" id="image-name" placeholder="Enter image name (e.g., nginx)">
+                            </div>
+                            <button id="scan-image" class="btn btn-primary">Scan Image</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title">System Stats</h5>
+                            <div id="stats" class="p-3 bg-light rounded">Loading...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row mt-4">
+                <div class="col-lg-6">
+                    <div class="card shadow-sm" id="admin">
+                        <div class="card-body">
+                            <h5 class="card-title">Admin Controls</h5>
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-danger">Restart System</button>
+                                <button class="btn btn-warning">Update Security Policies</button>
+                                <button class="btn btn-success">Backup System</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title">Additional Options</h5>
+                            <button class="btn btn-secondary">Manage Users</button>
+                            <button class="btn btn-info">System Configuration</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title">Scan Results</h5>
+                            <pre id="scan-output" class="p-3 bg-light rounded">No scan performed yet.</pre>
+                            <button id="generate-report" class="btn btn-success">Generate CVE Report</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="card shadow-sm mt-4">
+                        <div class="card-body">
+                            <h5 class="card-title">Running Containers</h5>
+                    <ul id="container-list" class="list-group">
+                        <li class="list-group-item">Loading...</li>
+                    </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <div class="card shadow-sm mt-4">
+                        <div class="card-body">
+                            <h5 class="card-title">System Logs</h5>
+                            <pre id="system-logs" class="p-3 bg-light rounded">Select a container to view logs.</pre>
+                            <button id="refresh-logs" class="btn btn-info">Refresh Logs</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+        
+        <!-- Right Panel for Alerts -->
+        <div class="bg-light border-start shadow-sm p-3 vh-100 d-flex flex-column" style="width: 300px;">
+            <h5 class="text-center text-danger">⚠ Important Alerts</h5>
+            <div class="alert alert-danger" role="alert">High CPU Usage detected!</div>
+            <div class="alert alert-warning" role="alert">New CVE vulnerabilities found!</div>
+            <div class="alert alert-info" role="alert">Container security breach attempt!</div>
+            <h6 class="mt-4 text-center">Recent Events</h6>
+            <ul class="list-group overflow-auto" style="max-height: 400px;">
+                <li class="list-group-item">Docker daemon restarted</li>
+                <li class="list-group-item">User admin logged in</li>
+                <li class="list-group-item">New container deployed</li>
+                <li class="list-group-item">Security policy updated</li>
+            </ul>
+            <button class="btn btn-primary mt-auto">View All Alerts</button>
+        </div>
     </div>
-
-    <div id="scan-results">
-        <h3>Scan Results</h3>
-        <pre id="scan-output">No scan performed yet.</pre>
-    </div>
-
-    <button id="generate-report">Generate CVE Report</button>
 </body>
 </html>
