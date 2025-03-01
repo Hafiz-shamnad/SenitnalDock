@@ -16,10 +16,10 @@ document.addEventListener("DOMContentLoaded", () => {
             let table = `<table border="1">
                 <tr>
                     <th>Container</th>
-                    <th>CPU%</th>
+                    <th>CPU</th>
                     <th>Memory Usage</th>
-                    <th>Memory%</th>
-                    <th>Network I/O</th>
+                    <th>Memory</th>
+                    <th>Network</th>
                     <th>Block I/O</th>
                     <th>PIDs</th>
                 </tr>`;
@@ -44,7 +44,56 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     setInterval(fetchStats, 5000); // Refresh stats every 5 seconds
-    
+    async function fetchStats() {
+        try {
+            let response = await fetch('/monitor');
+            let data = await response.json();
+
+            if (data.error) {
+                document.getElementById('stats').innerHTML = `
+                    <div class="alert alert-danger" role="alert">
+                        Error: ${data.error}
+                    </div>`;
+                return;
+            }
+
+            let table = `<table class="table table-striped table-hover">
+                <thead class="thead-dark">
+                    <tr>
+                        <th>Container</th>
+                        <th>CPU</th>
+                        <th>Memory Usage</th>
+                        <th>Memory</th>
+                        <th>Network</th>
+                        <th>Block I/O</th>
+                        <th>PIDs</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+            data.forEach(container => {
+                table += `<tr>
+                    <td>${container.Container}</td>
+                    <td>${container.CPUPerc}</td>
+                    <td>${container.MemUsage}</td>
+                    <td>${container.MemPerc}</td>
+                    <td>${container.NetIO}</td>
+                    <td>${container.BlockIO}</td>
+                    <td>${container.PIDs}</td>
+                </tr>`;
+            });
+
+            table += `</tbody></table>`;
+            document.getElementById('stats').innerHTML = table;
+        } catch (error) {
+            document.getElementById('stats').innerHTML = `
+                <div class="alert alert-danger" role="alert">
+                    Error fetching data.
+                </div>`;
+        }
+    }
+
+    setInterval(fetchStats, 5000);
 
     // Trigger Trivy scan
     scanButton.addEventListener("click", async () => {

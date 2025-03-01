@@ -20,6 +20,7 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 NVD_API_URL = "https://services.nvd.nist.gov/rest/json/cves"
 NVD_API_KEY = os.getenv("NVD_API_KEY")
 
+
 def run_trivy_scan(image_name):
     """
     Runs a Trivy scan on the specified Docker image.
@@ -163,16 +164,3 @@ def monitor_container():
 
 result = monitor_container()
 print(result)
-
-
-# def update_docker_stats():
-#     while True:
-#         monitor_container()
-#         socketio.sleep(5)  # Update stats every 5 seconds
-
-# def start_background_task():
-#     thread = threading.Thread(target=update_docker_stats)
-#     thread.daemon = True
-#     thread.start()
-
-
