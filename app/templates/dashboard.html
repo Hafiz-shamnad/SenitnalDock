@@ -8,6 +8,7 @@
     <script src="/static/js/bootstrap.bundle.min.js"></script>
     <link rel="stylesheet" href="/static/css/styles.css">
     <script src="/static/js/scripts.js" defer></script>
+    
 </head>
 <body class="bg-light">
     <nav class="navbar navbar-dark bg-dark p-3">
@@ -89,17 +90,28 @@
                 </div>
             </div>
             
-            <div class="row mt-4">
-                <div class="col-12">
-                    <div class="card shadow-sm">
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="card shadow-sm mt-4">
+                        <div class="card-body">
+                            <h5 class="card-title">Running Containers</h5>
+                    <ul id="container-list" class="list-group">
+                        <li class="list-group-item">Loading...</li>
+                    </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <div class="card shadow-sm mt-4">
                         <div class="card-body">
                             <h5 class="card-title">System Logs</h5>
-                            <pre id="system-logs" class="p-3 bg-light rounded">Fetching logs...</pre>
+                            <pre id="system-logs" class="p-3 bg-light rounded">Select a container to view logs.</pre>
                             <button id="refresh-logs" class="btn btn-info">Refresh Logs</button>
                         </div>
                     </div>
                 </div>
             </div>
+            
         </div>
         
         <!-- Right Panel for Alerts -->

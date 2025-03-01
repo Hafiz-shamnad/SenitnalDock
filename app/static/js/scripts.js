@@ -151,3 +151,87 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 });
+document.addEventListener("DOMContentLoaded", function () {
+    const containerList = document.getElementById("container-list");
+    const systemLogs = document.getElementById("system-logs");
+    const refreshLogsBtn = document.getElementById("refresh-logs");
+    
+    let selectedContainerId = null;
+    let ws = null;
+
+    // Fetch running containers
+    function fetchContainers() {
+        fetch("/containers")
+            .then(response => response.json())
+            .then(data => {
+                containerList.innerHTML = "";
+                if (data.error) {
+                    containerList.innerHTML = `<li class="list-group-item text-danger">${data.error}</li>`;
+                    return;
+                }
+
+                data.forEach(container => {
+                    const listItem = document.createElement("li");
+                    listItem.className = "list-group-item list-group-item-action";
+                    listItem.textContent = container.Name || container.Names[0];
+                    listItem.setAttribute("data-container-id", container.ID);
+
+                    listItem.addEventListener("click", function () {
+                        document.querySelectorAll(".list-group-item").forEach(item => item.classList.remove("active"));
+                        listItem.classList.add("active");
+
+                        selectedContainerId = container.ID;
+                        connectWebSocket(selectedContainerId);
+                    });
+
+                    containerList.appendChild(listItem);
+                });
+            })
+            .catch(error => {
+                containerList.innerHTML = `<li class="list-group-item text-danger">Error: ${error.message}</li>`;
+                console.error("Error fetching containers:", error);
+            });
+    }
+
+    function connectWebSocket(containerId) {
+        if (ws) {
+            ws.close();
+        }
+    
+        ws = new WebSocket(`ws://127.0.0.1:5000/logs`);
+    
+        ws.onopen = function () {
+            ws.send(JSON.stringify({ container: containerId }));
+            systemLogs.innerHTML = "";
+        };
+    
+        ws.onmessage = function (event) {
+            let logEntry = document.createElement("div");
+            logEntry.textContent = `${event.data}`;
+            logEntry.className = "log-entry";
+    
+            systemLogs.appendChild(logEntry);
+    
+            if (systemLogs.childElementCount > 20) {
+                systemLogs.removeChild(systemLogs.firstChild);
+            }
+        };
+    
+        ws.onerror = function (error) {
+            console.error("WebSocket error:", error);
+        };
+    
+        ws.onclose = function () {
+            console.log("WebSocket closed");
+        };
+    }
+
+    refreshLogsBtn.addEventListener("click", function () {
+        if (selectedContainerId) {
+            systemLogs.innerHTML = ""; 
+            connectWebSocket(selectedContainerId); // Reconnect to fetch new logs
+        }
+    });
+
+    fetchContainers();
+});

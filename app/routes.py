@@ -1,13 +1,14 @@
 from flask import Blueprint, render_template, jsonify, request
-from app.utils import run_trivy_scan, generate_report , get_mitigation , monitor_container
+from app.utils import run_trivy_scan, generate_report , get_mitigation , monitor_container , get_running_containers ,fetch_logs
 from flask import Flask, render_template, request, jsonify
-from flask_socketio import SocketIO
-from flask_cors import CORS
+from flask_sock import Sock
 import os
 
 app = Flask(__name__, static_url_path='', static_folder='static')
-socketio = SocketIO(app, cors_allowed_origins="*")
 main = Blueprint('main', __name__)
+sock = Sock()
+
+sock.init_app(main)
 
 NVD_API_KEY = os.getenv("NVD_API_KEY")
 
@@ -20,6 +21,24 @@ def get_container_stats():
     data = monitor_container()
     return jsonify(data)
 
+@main.route('/containers', methods=['GET'])
+def list_containers():
+    """API to return running containers."""
+    return jsonify(get_running_containers()) 
+    
+# @main.route('/logs', methods=['GET'])
+# def get_container_logs():
+#     container_name = request.args.get("container")
+    
+#     if not container_name:
+#         return jsonify({"error": "Container name is required"}), 400
+
+#     try:
+#         fetch_logs(container_name)  # Starts the logging thread
+#         return jsonify({"message": f"Started streaming logs for {container_name}"}), 200
+
+#     except Exception as e:
+#         return jsonify({"error": str(e)}), 500  # Ensure start_logs returns a response
 
 @main.route('/scan', methods=['POST'])
 def scan_image():
@@ -77,5 +96,18 @@ def generate_report_route():
     except Exception as e:
         return jsonify({'error': f"Failed to generate report: {e}"}), 500
 
+@sock.route("/logs")
+def stream_logs(ws):
+    while True:
+        message = ws.receive()  # ✅ WebSocket clients should send data
+        if not message:
+            ws.send("Error: No container specified")
+            continue
+
+        # Assuming message is the container name
+        container_name = message.strip()
+
+        fetch_logs(ws, container_name)  # Your log function
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=5000, debug=True)
