@@ -3,62 +3,74 @@ document.addEventListener("DOMContentLoaded", () => {
     const scanOutput = document.getElementById("scan-output");
     const reportButton = document.getElementById("generate-report");
 
-    async function fetchStats() {
+    let containerThresholds = {};  // Store thresholds for each container
+
+    async function updateContainers() {
         try {
             let response = await fetch('/monitor');
             let data = await response.json();
+            let thresholdContainer = document.getElementById("threshold-container");
 
             if (data.error) {
-                document.getElementById('stats').innerHTML = `<p style="color: red;">Error: ${data.error}</p>`;
+                thresholdContainer.innerHTML = `<p style="color: red;">Error: ${data.error}</p>`;
                 return;
             }
 
-            let table = `<table border="1">
-                <tr>
-                    <th>Container</th>
-                    <th>CPU</th>
-                    <th>Memory Usage</th>
-                    <th>Memory</th>
-                    <th>Network</th>
-                    <th>Block I/O</th>
-                    <th>PIDs</th>
-                </tr>`;
+            thresholdContainer.innerHTML = ""; // Clear old content
 
             data.forEach(container => {
-                table += `<tr>
-                    <td>${container.Container}</td>
-                    <td>${container.CPUPerc}</td>
-                    <td>${container.MemUsage}</td>
-                    <td>${container.MemPerc}</td>
-                    <td>${container.NetIO}</td>
-                    <td>${container.BlockIO}</td>
-                    <td>${container.PIDs}</td>
-                </tr>`;
-            });
+                let containerId = container.Container;
 
-            table += `</table>`;
-            document.getElementById('stats').innerHTML = table;
+                // Set default threshold values if not already set
+                if (!containerThresholds[containerId]) {
+                    containerThresholds[containerId] = { cpu: 80, memory: 70 };
+                }
+
+                let containerHTML = `
+                    <div class="mb-2 p-2 border rounded">
+                        <strong>${containerId}</strong>
+                        <label for="cpu-threshold-${containerId}" class="form-label mt-2">CPU Threshold (%)</label>
+                        <input type="number" id="cpu-threshold-${containerId}" class="form-control"
+                            value="${containerThresholds[containerId].cpu}">
+
+                        <label for="mem-threshold-${containerId}" class="form-label mt-2">Memory Threshold (%)</label>
+                        <input type="number" id="mem-threshold-${containerId}" class="form-control"
+                            value="${containerThresholds[containerId].memory}">
+                    </div>
+                `;
+
+                thresholdContainer.innerHTML += containerHTML;
+            });
         } catch (error) {
-            document.getElementById('stats').innerHTML = `<p style="color: red;">Error fetching data</p>`;
+            document.getElementById("threshold-container").innerHTML = `<p style="color: red;">Error fetching container list.</p>`;
         }
     }
 
-    setInterval(fetchStats, 5000); // Refresh stats every 5 seconds
+    document.getElementById("set-thresholds").addEventListener("click", () => {
+        let inputs = document.querySelectorAll("[id^='cpu-threshold-'], [id^='mem-threshold-']");
+
+        inputs.forEach(input => {
+            let containerId = input.id.split("-").slice(2).join("-");  // Extract container name from input ID
+            let type = input.id.includes("cpu") ? "cpu" : "memory";
+            containerThresholds[containerId][type] = input.value;
+        });
+
+        alert("Thresholds updated!");
+    });
+
     async function fetchStats() {
         try {
             let response = await fetch('/monitor');
             let data = await response.json();
+            let alertPanel = document.getElementById("alert-panel");
 
             if (data.error) {
-                document.getElementById('stats').innerHTML = `
-                    <div class="alert alert-danger" role="alert">
-                        Error: ${data.error}
-                    </div>`;
+                document.getElementById("stats").innerHTML = `<p style="color: red;">Error: ${data.error}</p>`;
                 return;
             }
 
-            let table = `<table class="table table-striped table-hover">
-                <thead class="thead-dark">
+            let table = `<table class="table table-striped">
+                <thead>
                     <tr>
                         <th>Container</th>
                         <th>CPU</th>
@@ -71,9 +83,15 @@ document.addEventListener("DOMContentLoaded", () => {
                 </thead>
                 <tbody>`;
 
+            alertPanel.innerHTML = "";  // Clear old alerts
+
             data.forEach(container => {
+                let containerId = container.Container;
+                let cpuUsage = parseFloat(container.CPUPerc.replace("%", ""));
+                let memUsage = parseFloat(container.MemPerc.replace("%", ""));
+
                 table += `<tr>
-                    <td>${container.Container}</td>
+                    <td>${containerId}</td>
                     <td>${container.CPUPerc}</td>
                     <td>${container.MemUsage}</td>
                     <td>${container.MemPerc}</td>
@@ -81,19 +99,34 @@ document.addEventListener("DOMContentLoaded", () => {
                     <td>${container.BlockIO}</td>
                     <td>${container.PIDs}</td>
                 </tr>`;
+
+                // Get per-container thresholds
+                let cpuThreshold = containerThresholds[containerId]?.cpu || 80;
+                let memThreshold = containerThresholds[containerId]?.memory || 70;
+
+                if (cpuUsage > cpuThreshold) {
+                    alertPanel.innerHTML += `<div class="alert alert-warning">
+                        ⚠️ High CPU usage on ${containerId}: ${cpuUsage}%
+                    </div>`;
+                }
+                
+                if (memUsage > memThreshold) {
+                    alertPanel.innerHTML += `<div class="alert alert-danger">
+                        🔥 High Memory usage on ${containerId}: ${memUsage}%
+                    </div>`;
+                }
             });
 
             table += `</tbody></table>`;
-            document.getElementById('stats').innerHTML = table;
+            document.getElementById("stats").innerHTML = table;
         } catch (error) {
-            document.getElementById('stats').innerHTML = `
-                <div class="alert alert-danger" role="alert">
-                    Error fetching data.
-                </div>`;
+            document.getElementById("stats").innerHTML = `<p style="color: red;">Error fetching data</p>`;
         }
     }
 
-    setInterval(fetchStats, 5000);
+    updateContainers();
+    setInterval(updateContainers, 10000);  // Update the container list every 10 sec
+    setInterval(fetchStats, 5000);  // Fetch stats every 5 sec
 
     // Trigger Trivy scan
     scanButton.addEventListener("click", async () => {
@@ -235,3 +268,5 @@ document.addEventListener("DOMContentLoaded", function () {
 
     fetchContainers();
 });
+
+

@@ -60,19 +60,21 @@
                         <div class="card-body">
                             <h5 class="card-title">Admin Controls</h5>
                             <div class="d-grid gap-2">
-                                <button class="btn btn-danger">Restart System</button>
-                                <button class="btn btn-warning">Update Security Policies</button>
+                                <a href="/stop" class="btn btn-danger">Stop a Container</a>
+                                <a href="/restart" class="btn btn-warning">Restart a Container</a>
                                 <button class="btn btn-success">Backup System</button>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="col-lg-6">
-                    <div class="card shadow-sm">
+                    <div class="card shadow-sm" id="admin">
                         <div class="card-body">
-                            <h5 class="card-title">Additional Options</h5>
-                            <button class="btn btn-secondary">Manage Users</button>
-                            <button class="btn btn-info">System Configuration</button>
+                            <h5 class="card-title">Alert System</h5>
+                            <div id="threshold-container">
+                                <p>Loading running containers...</p>
+                            </div>
+                            <button id="set-thresholds" class="btn btn-success mt-3">Set Thresholds</button>
                         </div>
                     </div>
                 </div>
@@ -116,17 +118,12 @@
         
         <!-- Right Panel for Alerts -->
         <div class="bg-light border-start shadow-sm p-3 vh-100 d-flex flex-column" style="width: 300px;">
-            <h5 class="text-center text-danger">⚠ Important Alerts</h5>
-            <div class="alert alert-danger" role="alert">High CPU Usage detected!</div>
-            <div class="alert alert-warning" role="alert">New CVE vulnerabilities found!</div>
-            <div class="alert alert-info" role="alert">Container security breach attempt!</div>
-            <h6 class="mt-4 text-center">Recent Events</h6>
-            <ul class="list-group overflow-auto" style="max-height: 400px;">
-                <li class="list-group-item">Docker daemon restarted</li>
-                <li class="list-group-item">User admin logged in</li>
-                <li class="list-group-item">New container deployed</li>
-                <li class="list-group-item">Security policy updated</li>
-            </ul>
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title">Alerts</h5>
+                        <div id="alert-panel" class="p-3 bg-light rounded" style="min-height: 100px;">No alerts</div>
+                    </div>
+                </div>
             <button class="btn btn-primary mt-auto">View All Alerts</button>
         </div>
     </div>

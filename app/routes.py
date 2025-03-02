@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, jsonify, request
-from app.utils import run_trivy_scan, generate_report , get_mitigation , monitor_container , get_running_containers ,fetch_logs
+from app.utils import run_trivy_scan, generate_report , get_mitigation , monitor_container , get_running_containers ,fetch_logs , stop_container , restart_container
 from flask import Flask, render_template, request, jsonify
 from flask_sock import Sock
 import os
@@ -25,20 +25,6 @@ def get_container_stats():
 def list_containers():
     """API to return running containers."""
     return jsonify(get_running_containers()) 
-    
-# @main.route('/logs', methods=['GET'])
-# def get_container_logs():
-#     container_name = request.args.get("container")
-    
-#     if not container_name:
-#         return jsonify({"error": "Container name is required"}), 400
-
-#     try:
-#         fetch_logs(container_name)  # Starts the logging thread
-#         return jsonify({"message": f"Started streaming logs for {container_name}"}), 200
-
-#     except Exception as e:
-#         return jsonify({"error": str(e)}), 500  # Ensure start_logs returns a response
 
 @main.route('/scan', methods=['POST'])
 def scan_image():
@@ -108,6 +94,74 @@ def stream_logs(ws):
         container_name = message.strip()
 
         fetch_logs(ws, container_name)  # Your log function
+        
+@main.route("/stop_container", methods=["POST"])
+def stop():
+    """Stop selected containers."""
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "Invalid JSON or no JSON provided"}), 400
+
+    container_ids = data.get("container_ids")  # Match frontend key
+    if not container_ids or not isinstance(container_ids, list):
+        return jsonify({"error": "Container IDs are required and must be a list"}), 400
+
+    stopped_containers = []
+    errors = []
+
+    for container_id in container_ids:
+        try:
+            stop_container(container_id)
+            stopped_containers.append(container_id)
+        except Exception as e:
+            errors.append(f"Failed to stop {container_id}: {str(e)}")
+
+    if errors:
+        return jsonify({"error": errors, "stopped_containers": stopped_containers}), 500
+
+    return jsonify({"message": f"Containers {', '.join(stopped_containers)} stopped successfully"}), 200
+
+@main.route("/restart_container", methods=["POST"])
+def restart():
+    """Restart selected containers."""
+    data = request.get_json(silent=True)
+    
+    if not data:
+        return jsonify({"error": "Invalid JSON or no JSON provided"}), 400
+
+    container_ids = data.get("container_ids")  # Match frontend key
+    if not container_ids or not isinstance(container_ids, list):
+        return jsonify({"error": "Container IDs are required and must be a list"}), 400
+
+    restarted_containers = []
+    errors = []
+
+    for container_id in container_ids:
+        try:
+            restart_container(container_id)
+            restarted_containers.append(container_id)
+        except Exception as e:
+            errors.append(f"Failed to restart {container_id}: {str(e)}")
+
+    response = {
+        "restarted_containers": restarted_containers,
+        "errors": errors
+    }
+
+    status_code = 200 if not errors else 207  # 207: Multi-Status (some succeeded, some failed)
+    return jsonify(response), status_code
+
+
+
+@main.route("/stop", methods=["GET"])
+def stop_page():
+    """Render the container stopping page."""
+    return render_template("stop_container.html")
+
+@main.route("/restart", methods=["GET"])
+def restart_page():
+    """Render the container stopping page."""
+    return render_template("restart_container.html")
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

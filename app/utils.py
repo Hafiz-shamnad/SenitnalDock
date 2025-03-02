@@ -219,3 +219,35 @@ def fetch_logs(ws, container_name):
     except Exception as e:
         print(error_msg)
         ws.send(error_msg)
+            
+# Define function to stop a container
+def stop_container(container_id):
+    try:
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(SSH_HOST, username=SSH_USER, key_filename=os.path.expanduser(SSH_KEY))
+
+        command = f"docker stop {container_id}"
+        ssh.exec_command(command)
+        ssh.close()
+
+        return jsonify({"message": f"Container {container_id} stopped successfully"}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+# Define function to restart a container
+def restart_container(container_id):
+    try:
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(SSH_HOST, username=SSH_USER, key_filename=os.path.expanduser(SSH_KEY))
+
+        command = f"docker restart {container_id}"
+        ssh.exec_command(command)
+        ssh.close()
+
+        return jsonify({"message": f"Container {container_id} restarted successfully"}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
