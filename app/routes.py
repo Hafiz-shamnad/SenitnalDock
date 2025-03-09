@@ -213,7 +213,26 @@ def login():
             db.session.commit()
 
             # Send OTP via email
-            send_email(user.email, "Your OTP Code", f"Your OTP is: {otp}")
+            send_email(
+    user.email,
+    "🔒 Secure Login OTP - Action Required",
+    body=f"Your OTP is: {otp}. Please use it within 10 minutes.",
+    html_body=f"""
+    <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6;">
+            <h2 style="color: #2C3E50;">Your One-Time Password (OTP)</h2>
+            <p>Dear {user.username},</p>
+            <p>We received a login request for your account. To proceed, please use the following OTP:</p>
+            <h3 style="color: #27AE60; font-size: 24px;">{otp}</h3>
+            <p>This OTP is valid for <strong>10 minutes</strong>. Please do not share it with anyone.</p>
+            <p>If you did not attempt to log in, please ignore this email or contact support immediately.</p>
+            <hr>
+            <p style="font-size: 14px; color: #7F8C8D;">Best regards,<br><strong>Team SentinalDock</strong></p>
+        </body>
+    </html>
+    """
+)
+
 
             session['username'] = username  # Store user session
             flash('OTP sent to your email. Please verify.', 'info')

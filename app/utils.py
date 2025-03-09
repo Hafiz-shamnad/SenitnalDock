@@ -8,8 +8,9 @@ from reportlab.pdfgen import canvas
 from fpdf import FPDF
 from flask import Flask
 from flask import Flask, jsonify 
-from flask_mailman import EmailMessage
-from app.extensions import mail
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from config import Config
 
 
@@ -254,29 +255,31 @@ def restart_container(container_id):
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-    
 
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 
-def send_email(user_email, subject, body):
+def send_email(user_email, subject, body, html_body=None):
     try:
-        # Set up the MIME
+        # Set up the email
         msg = MIMEMultipart()
         msg['From'] = Config.MAIL_DEFAULT_SENDER
         msg['To'] = user_email
         msg['Subject'] = subject
+
+        # Attach plain text (fallback for clients that don't support HTML)
         msg.attach(MIMEText(body, 'plain'))
-        
+
+        # Attach HTML version if provided
+        if html_body:
+            msg.attach(MIMEText(html_body, 'html'))
+
         # Connect to Gmail's SMTP server
-        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)# Secure the connection
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
         server.login(Config.MAIL_DEFAULT_SENDER, Config.MAIL_PASSWORD)
-        
+
         # Send the email
         server.sendmail(Config.MAIL_DEFAULT_SENDER, user_email, msg.as_string())
         server.quit()
-        
+
         print("Email sent successfully!")
     except Exception as e:
         print(f"Error: {e}")
