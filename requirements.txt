@@ -7,3 +7,5 @@ flask-sock
 flask-socketio
 reportlab
 sock
+flask_login
+Flask-SQLAlchemy psycopg2

@@ -1,6 +1,13 @@
-from flask import Blueprint, render_template, jsonify, request
-from app.utils import run_trivy_scan, generate_report , get_mitigation , monitor_container , get_running_containers ,fetch_logs , stop_container , restart_container
+from flask import Blueprint, render_template, jsonify, request , redirect, url_for, session, flash , send_file
+from app.utils import run_trivy_scan, generate_report , get_mitigation , monitor_container , get_running_containers ,fetch_logs , stop_container , restart_container ,send_email
 from flask import Flask, render_template, request, jsonify
+from flask_login import login_user, login_required, logout_user, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask_login import LoginManager
+import random
+import pyotp
+from flask_login import login_user
+from app.models.user import User, db 
 from flask_sock import Sock
 import os
 
@@ -11,9 +18,17 @@ sock = Sock()
 sock.init_app(main)
 
 NVD_API_KEY = os.getenv("NVD_API_KEY")
+login_manager = LoginManager()
+login_manager.init_app(app)  # Attach it to the Flask app
+login_manager.login_view = 'main.login'  # Redirect to login page if unauthorized
+
 
 @main.route('/')
 def home():
+    return redirect(url_for('main.login'))
+
+@main.route('/dashboard')
+def dashboard():
     return render_template('dashboard.html')
 
 @main.route('/monitor', methods=['GET'])
@@ -162,6 +177,124 @@ def stop_page():
 def restart_page():
     """Render the container stopping page."""
     return render_template("restart_container.html")
+
+
+
+
+@main.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form['username']
+        email = request.form['email']
+        password = generate_password_hash(request.form['password'], method='pbkdf2:sha256')
+
+        if User.query.filter_by(username=username).first() or User.query.filter_by(email=email).first():
+            flash('Username or email already exists', 'danger')
+            return redirect(url_for('main.register'))
+
+        new_user = User(username=username, email=email, password=password)
+        db.session.add(new_user)
+        db.session.commit()
+        flash('Registration successful! Please login.', 'success')
+        return redirect(url_for('main.login'))
+    return render_template('register.html')
+
+@main.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        user = User.query.filter_by(username=username).first()
+
+        if user and check_password_hash(user.password, password):
+            # Generate a random 6-digit OTP
+            otp = str(random.randint(100000, 999999))
+            user.otp = otp
+            db.session.commit()
+
+            # Send OTP via email
+            send_email(user.email, "Your OTP Code", f"Your OTP is: {otp}")
+
+            session['username'] = username  # Store user session
+            flash('OTP sent to your email. Please verify.', 'info')
+            return redirect(url_for('main.verify_otp'))
+
+        flash('Invalid username or password', 'danger')
+    return render_template('login.html')
+
+@main.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('main.login'))
+
+
+
+@main.route('/verify-otp', methods=['GET', 'POST'])
+def verify_otp():
+    username = session.get('username')
+    if not username:
+        flash("Session expired. Please log in again.", "warning")
+        return redirect(url_for("main.login"))
+
+    user = User.query.filter_by(username=username).first()
+    
+    if not user:
+        flash("User not found.", "danger")
+        return redirect(url_for("main.login"))
+
+    if request.method == 'POST':
+        otp = request.form['otp']
+
+        if user.otp is None:
+            flash("No OTP found. Request a new one.", "danger")
+            return redirect(url_for("main.login"))
+
+        print(f"Stored OTP: {user.otp} (Type: {type(user.otp)}), Entered OTP: {otp} (Type: {type(otp)})")  # Debugging line
+
+        if str(user.otp) == str(otp):  # Ensure type consistency
+            load_user(user.id)  # Pass only the user ID
+            user.otp = None  # Clear OTP after successful verification
+            db.session.commit()
+            return redirect(url_for('main.dashboard'))
+
+        flash('Invalid OTP', 'danger')
+
+    return render_template('verify_otp.html')
+
+
+
+
+@main.route('/setup-2fa')
+def setup_2fa():
+    user = User.query.filter_by(username=session.get('username')).first()
+
+    if not user.otp_secret:
+        user.otp_secret = pyotp.random_base32()
+        db.session.commit()
+
+    totp = pyotp.TOTP(user.otp_secret)
+    qr_code_url = totp.provisioning_uri(user.email, issuer_name="FlaskApp")
+
+    return render_template('setup_2fa.html', qr_url=qr_code_url)
+
+@main.route('/verify-totp', methods=['POST'])
+def verify_totp():
+    otp = request.form['otp']
+    user = User.query.filter_by(username=session.get('username')).first()
+    
+    totp = pyotp.TOTP(user.otp_secret)
+    if totp.verify(otp):
+        login_user(user)
+        return redirect(url_for('main.dashboard'))
+    
+    flash('Invalid TOTP', 'danger')
+    return redirect(url_for('main.setup_2fa'))
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))  
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
