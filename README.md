@@ -15,6 +15,7 @@ A **powerful container security toolkit** designed to **secure Docker environmen
 ✅ **PDF Report Generation** - Generate detailed security reports with mitigation insights from the NVD.  
 ✅ **Interactive HTML Dashboard** - View security scan results and system metrics on a user-friendly web interface.
 
+![Sentinel Dock Dashboard](assets/login.png)
 ![Sentinel Dock Dashboard](assets/dashboard.png)
 
 ---
