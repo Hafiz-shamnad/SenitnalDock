@@ -1,90 +1,104 @@
-# Sentinel Dock
+# ![Sentinel Dock](assets/logo.png)
 
-Sentinel Dock is a powerful container security toolkit designed to secure Docker environments by providing essential features for vulnerability scanning, real-time monitoring, and container security. This project integrates **Trivy** for scanning vulnerabilities and continuously monitors Docker containers to detect potential security risks such as container escapes, misconfigurations, and resource usage anomalies.
+## Sentinel Dock 🚀  
 
-## Features
+A **powerful container security toolkit** designed to **secure Docker environments** with real-time monitoring, vulnerability scanning, and container security enhancements.
 
-- **Vulnerability Scanning with Trivy**: Automatically scan Docker images for vulnerabilities and generate a list of Common Vulnerabilities and Exposures (CVEs).
-- **Real-time Monitoring**: Monitor Docker container metrics (such as CPU usage) and dynamically update the status on a web-based frontend.
-- **Container Escape Detection**: Detect and alert on potential container escape attempts, improving overall security.
-- **Configuration Hardening**: Provide guidelines to harden Docker container configurations for enhanced security.
-- **PDF Report Generation**: Generate detailed PDF reports for security analysts, combining CVE data and mitigation suggestions from the National Vulnerability Database (NVD).
-- **HTML Frontend**: Visualize container metrics and security scan results with an intuitive web interface.
+---
 
-## Installation
+### 🔥 Features
 
-Follow these steps to set up Sentinel Dock on your local machine.
+✅ **Vulnerability Scanning with Trivy** - Scan Docker images and detect Common Vulnerabilities and Exposures (CVEs).  
+✅ **Real-time Monitoring** - Track Docker container metrics like CPU and memory usage via an intuitive dashboard.  
+✅ **Container Escape Detection** - Get alerts on potential container breakout attempts.  
+✅ **Configuration Hardening** - Secure your Docker environment with best-practice recommendations.  
+✅ **PDF Report Generation** - Generate detailed security reports with mitigation insights from the NVD.  
+✅ **Interactive HTML Dashboard** - View security scan results and system metrics on a user-friendly web interface.
 
-### Prerequisites
+![Sentinel Dock Dashboard](assets/dashboard.png)
 
-- **Docker**: Make sure Docker is installed and running on your machine.
-- **Python**: Sentinel Dock is built using Python (Flask). Ensure you have Python 3.x installed.
-- **Trivy**: Trivy is required for scanning Docker images for vulnerabilities.
+---
 
-### Steps
+## 🚀 Installation Guide
 
-1. Clone the repository:
+### 🔗 Prerequisites
 
-    ```bash
-    git clone https://github.com/<your-username>/sentinel-dock.git
-    cd sentinel-dock
-    ```
+- **Docker** 🐳 installed and running.
+- **Python 3.x** 🐍 installed.
+- **Trivy** installed for vulnerability scanning.
 
-2. Create a virtual environment and install dependencies:
+### 📌 Setup Instructions
 
-    ```bash
-    python3 -m venv venv
-    source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
-    pip install -r requirements.txt
-    ```
+1️⃣ **Clone the repository**
+```bash
+git clone https://github.com/<your-username>/sentinel-dock.git
+cd sentinel-dock
+```
 
-3. Install Trivy:
+2️⃣ **Set up a virtual environment**
+```bash
+python3 -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+```
 
-    ```bash
-    brew install aquasecurity/trivy/trivy  # For macOS users
-    sudo apt-get install trivy  # For Ubuntu users
-    ```
+3️⃣ **Install Trivy**
+```bash
+# macOS
+brew install aquasecurity/trivy/trivy
 
-4. Run the application:
+# Ubuntu
+sudo apt-get install trivy
+```
 
-    ```bash
-    python app.py
-    ```
+4️⃣ **Run Sentinel Dock**
+```bash
+python app.py
+```
+📌 Now visit **[http://localhost:5000](http://localhost:5000)** to access the dashboard.
 
-    The web frontend will be accessible at [http://localhost:5000](http://localhost:5000).
+---
 
+## 📊 Viewing Metrics & Reports
 
+- **Real-time Monitoring:** Navigate to the **Dashboard** to track live container stats.
+- **Security Reports:** View and download detailed PDF reports containing vulnerability data and mitigation strategies.
 
-Sentinel Dock will automatically scan the Docker image and display the results in the frontend.
+![Security Report](assets/report.png)
 
-### Viewing Metrics
+---
 
-Once the application is running, open a browser and navigate to [http://localhost:5000](http://localhost:5000). You’ll see real-time monitoring data such as CPU usage and a list of vulnerabilities.
+## 🛠️ Roadmap
 
-### PDF Report
+✅ **Database Integration** - Store scan results & system metrics for historical analysis.  
+✅ **Expanded Reporting** - Customize and schedule security reports.  
+✅ **Container Orchestration** - Add support for Kubernetes for enterprise-scale security.
 
-The system generates a PDF report with a list of vulnerabilities detected and mitigations from the National Vulnerability Database (NVD). The report is available from the frontend or can be triggered manually from the CLI.
+---
 
-## Roadmap
+## 🤝 Contributing
 
-- **Database Integration**: Adding a database to store historical scan results and metrics.
-- **Container Orchestration**: Integrate Kubernetes support for a more robust container orchestration environment.
-- **Expanded Reporting**: Add more customizable report generation options.
+We welcome contributions! Follow these steps:
 
-## Contributing
+1️⃣ **Fork the repo**  
+2️⃣ **Create a feature branch** (`git checkout -b feature-name`)  
+3️⃣ **Commit changes** (`git commit -m 'Added a new feature'`)  
+4️⃣ **Push to GitHub** (`git push origin feature-name`)  
+5️⃣ **Submit a Pull Request** 🎉  
 
-1. Fork the repository.
-2. Create a new branch (`git checkout -b feature-name`).
-3. Commit your changes (`git commit -am 'Add new feature'`).
-4. Push to the branch (`git push origin feature-name`).
-5. Create a new Pull Request.
+---
 
-## License
+## 📜 License
 
-Sentinel Dock is licensed under the Apache 2.0 License - see the [LICENSE](LICENSE) file for details.
+Sentinel Dock is **open-source** and licensed under **Apache 2.0**. Check the [LICENSE](LICENSE) file for details.
 
-## Acknowledgements
+---
 
-- **Trivy**: Used for vulnerability scanning in Docker containers.
-- **Flask**: Used for the web framework to create the frontend.
-- **Docker**: Used as the containerization platform for testing and running the security toolkit.
+## 🎖️ Acknowledgements
+
+- **[Trivy](https://aquasecurity.github.io/trivy/)** - Vulnerability scanning for Docker containers.
+- **[Flask](https://flask.palletsprojects.com/)** - Web framework for the frontend.
+- **[Docker](https://www.docker.com/)** - Containerization platform.
+
+🚀 **Secure your containers today with Sentinel Dock!** 🛡️
+
