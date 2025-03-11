@@ -1,0 +1,186 @@
+:root {
+    --primary: #0a4d68;
+    --primary-dark: #05303f;
+    --secondary: #06bedd;
+    --accent: #00ffff;
+    --dark: #112240;
+    --light: #e7f9fc;
+    --danger: #ff3a5e;
+  }
+  
+  body {
+    background-color: var(--dark);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: var(--light);
+    background-image: 
+      radial-gradient(circle at 25% 25%, rgba(10, 77, 104, 0.2) 0%, transparent 50%),
+      radial-gradient(circle at 75% 75%, rgba(6, 190, 221, 0.1) 0%, transparent 50%);
+  }
+  
+  .otp-container {
+    max-width: 350px;
+    padding: 2.5rem;
+    border-radius: 12px;
+    background-color: rgba(17, 34, 64, 0.8);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(6, 190, 221, 0.2);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 
+                0 0 0 1px rgba(6, 190, 221, 0.1),
+                0 0 15px rgba(0, 255, 255, 0.1);
+  }
+  
+  .otp-header {
+    margin-bottom: 2rem;
+    text-align: center;
+  }
+  
+  .otp-header h4 {
+    font-weight: 600;
+    color: var(--light);
+    position: relative;
+    display: inline-block;
+    margin-bottom: 0.5rem;
+  }
+  
+  .otp-header h4:after {
+    content: '';
+    position: absolute;
+    width: 50px;
+    height: 3px;
+    background: linear-gradient(90deg, var(--secondary), var(--accent));
+    bottom: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-radius: 3px;
+  }
+  
+  .otp-icon {
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    width: 60px;
+    height: 60px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+    box-shadow: 0 5px 15px rgba(6, 190, 221, 0.3);
+  }
+  
+  .form-label {
+    font-weight: 500;
+    color: var(--light);
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  
+  .form-control {
+    border-radius: 8px;
+    padding: 12px 15px;
+    background-color: rgba(231, 249, 252, 0.05);
+    border: 1px solid rgba(6, 190, 221, 0.2);
+    color: var(--light);
+    transition: all 0.3s;
+    text-align: center;
+    font-size: 1.2rem;
+    letter-spacing: 4px;
+  }
+  
+  .form-control:focus {
+    background-color: rgba(231, 249, 252, 0.1);
+    border-color: var(--secondary);
+    box-shadow: 0 0 0 3px rgba(6, 190, 221, 0.2);
+    color: var(--light);
+  }
+  
+  .form-control::placeholder {
+    color: rgba(231, 249, 252, 0.4);
+    letter-spacing: 0;
+    font-size: 0.9rem;
+  }
+  
+  .btn-primary {
+    background: linear-gradient(90deg, var(--primary), var(--secondary));
+    border: none;
+    border-radius: 8px;
+    padding: 12px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    transition: all 0.3s;
+    text-transform: uppercase;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .btn-primary:hover {
+    background: linear-gradient(90deg, var(--primary-dark), var(--primary));
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(6, 190, 221, 0.4);
+  }
+  
+  .btn-primary:after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -50%;
+    bottom: -50%;
+    left: -50%;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0));
+    transform: rotateZ(60deg) translate(-5em, 7.5em);
+    opacity: 0;
+    transition: opacity 0.5s;
+  }
+  
+  .btn-primary:hover:after {
+    animation: sheen 1s forwards;
+    opacity: 1;
+  }
+  
+  @keyframes sheen {
+    100% {
+      transform: rotateZ(60deg) translate(1em, -9em);
+    }
+  }
+  
+  .back-link {
+    font-size: 0.9rem;
+    color: rgba(231, 249, 252, 0.7);
+  }
+  
+  .back-link a {
+    color: var(--secondary);
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.3s;
+  }
+  
+  .back-link a:hover {
+    color: var(--accent);
+    text-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
+  }
+  
+  .alert {
+    border-radius: 8px;
+    background-color: rgba(255, 58, 94, 0.1);
+    border-color: rgba(255, 58, 94, 0.2);
+    color: #ff8fa6;
+  }
+  
+  .alert-success {
+    background-color: rgba(0, 255, 255, 0.1);
+    border-color: rgba(0, 255, 255, 0.2);
+    color: var(--accent);
+  }
+  
+  .otp-timer {
+    font-size: 0.8rem;
+    color: rgba(231, 249, 252, 0.6);
+    margin-top: 1rem;
+    text-align: center;
+  }
+  
+  .otp-timer span {
+    font-weight: 600;
+    color: var(--secondary);
+  }

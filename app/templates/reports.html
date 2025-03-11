@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CVE Reports | SentinalDock</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css">
+  <style>
+    :root {
+      --primary: #0a4d68;
+      --primary-dark: #05303f;
+      --secondary: #06bedd;
+      --accent: #00ffff;
+      --dark: #112240;
+      --light: #e7f9fc;
+      --danger: #ff3a5e;
+    }
+    
+    body {
+      margin:8px;
+      background-color: var(--dark);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--light);
+      background-image: 
+        radial-gradient(circle at 25% 25%, rgba(10, 77, 104, 0.2) 0%, transparent 50%),
+        radial-gradient(circle at 75% 75%, rgba(6, 190, 221, 0.1) 0%, transparent 50%);
+    }
+    
+    .reports-container {
+
+      padding: 2.5rem;
+      border-radius: 12px;
+      background-color: rgba(17, 34, 64, 0.8);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(6, 190, 221, 0.2);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 
+                  0 0 0 1px rgba(6, 190, 221, 0.1),
+                  0 0 15px rgba(0, 255, 255, 0.1);
+    }
+    
+    .reports-header {
+      margin-bottom: 2rem;
+      text-align: center;
+    }
+    
+    .reports-header h2 {
+      font-weight: 600;
+      color: var(--light);
+      position: relative;
+      display: inline-block;
+    }
+    
+    .reports-header h2:after {
+      content: '';
+      position: absolute;
+      width: 60px;
+      height: 3px;
+      background: linear-gradient(90deg, var(--secondary), var(--accent));
+      bottom: -10px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-radius: 3px;
+    }
+    
+    .reports-icon {
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      width: 70px;
+      height: 70px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1.5rem;
+      box-shadow: 0 5px 15px rgba(6, 190, 221, 0.3);
+    }
+    
+    .btn-primary {
+      background: linear-gradient(90deg, var(--primary), var(--secondary));
+      border: none;
+      border-radius: 8px;
+      padding: 8px 15px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      transition: all 0.3s;
+      text-transform: uppercase;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .btn-primary:hover {
+      background: linear-gradient(90deg, var(--primary-dark), var(--primary));
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(6, 190, 221, 0.4);
+    }
+    
+    .btn-primary:after {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -50%;
+      bottom: -50%;
+      left: -50%;
+      background: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0));
+      transform: rotateZ(60deg) translate(-5em, 7.5em);
+      opacity: 0;
+      transition: opacity 0.5s;
+    }
+    
+    .btn-primary:hover:after {
+      animation: sheen 1s forwards;
+      opacity: 1;
+    }
+    
+    @keyframes sheen {
+      100% {
+        transform: rotateZ(60deg) translate(1em, -9em);
+      }
+    }
+
+    /* DataTables Customization */
+    .dataTables_wrapper .dataTables_length, 
+    .dataTables_wrapper .dataTables_filter, 
+    .dataTables_wrapper .dataTables_info, 
+    .dataTables_wrapper .dataTables_processing, 
+    .dataTables_wrapper .dataTables_paginate {
+      color: var(--light);
+      margin-bottom: 1rem;
+    }
+    
+    .dataTables_wrapper .dataTables_length select,
+    .dataTables_wrapper .dataTables_filter input {
+      background-color: rgba(231, 249, 252, 0.05);
+      border: 1px solid rgba(6, 190, 221, 0.2);
+      color: var(--light);
+      border-radius: 8px;
+      padding: 5px 10px;
+    }
+    
+    .dataTables_wrapper .dataTables_filter input:focus {
+      background-color: rgba(231, 249, 252, 0.1);
+      border-color: var(--secondary);
+      box-shadow: 0 0 0 3px rgba(6, 190, 221, 0.2);
+      outline: none;
+    }
+    
+    table.dataTable thead th {
+      background-color: var(--primary-dark);
+      color: var(--light);
+      border-bottom: 2px solid var(--secondary);
+      padding: 12px 15px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    
+    table.dataTable tbody tr {
+      background-color: rgba(231, 249, 252, 0.05);
+    }
+    
+    table.dataTable tbody tr:hover {
+      background-color: rgba(6, 190, 221, 0.1);
+    }
+    
+    table.dataTable tbody td {
+      padding: 12px 15px;
+      border-bottom: 1px solid rgba(6, 190, 221, 0.1);
+      color: var(--primary-dark);
+    }
+    
+    .dataTables_wrapper .dataTables_paginate .paginate_button {
+      color: var(--light) !important;
+      border: 1px solid rgba(6, 190, 221, 0.2);
+      background: transparent;
+      border-radius: 4px;
+      padding: 5px 10px;
+      margin: 0 3px;
+    }
+    
+    .dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+      background: rgba(6, 190, 221, 0.2);
+      border-color: var(--secondary);
+      color: var(--accent) !important;
+    }
+    
+    .dataTables_wrapper .dataTables_paginate .paginate_button.current,
+    .dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
+      background: linear-gradient(90deg, var(--primary), var(--secondary));
+      border-color: var(--secondary);
+      color: white !important;
+    }
+  </style>
+</head>
+<body class="align-items-center justify-content-cente">
+  <div class="reports-container">
+    <div class="reports-header">
+      <h2>CVE Reports</h2>
+    </div>
+    
+    <table class="table" id="reportsTable">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Filename</th>
+          <th>Generated At</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for report in reports %}
+        <tr>
+          <td>{{ report.id }}</td>
+          <td>{{ report.filename }}</td>
+          <td>{{ report.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+          <td>
+            <a href="{{ url_for('main.download_report', report_id=report.id) }}" class="btn btn-primary btn-sm">Download</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
+  <script>
+    $(document).ready(function() {
+      $('#reportsTable').DataTable({
+        language: {
+          search: "_INPUT_",
+          searchPlaceholder: "Search reports...",
+          lengthMenu: "Show _MENU_ reports per page",
+          info: "Showing _START_ to _END_ of _TOTAL_ reports",
+          infoEmpty: "No reports available",
+          infoFiltered: "(filtered from _MAX_ total reports)"
+        },
+        ordering: true,
+        paging: true,
+        pageLength: 10,
+        lengthMenu: [[5, 10, 25, 50, -1], [5, 10, 25, 50, "All"]]
+      });
+    });
+  </script>
+</body>
+</html>
