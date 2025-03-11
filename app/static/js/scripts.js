@@ -178,7 +178,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!response.ok) throw new Error("Failed to generate report.");
 
             const result = await response.json();
-            alert(`Report generated! Download it from: ${result.pdf}`);
+            alert(`Report generated!`);
         } catch (error) {
             alert(`Error: ${error.message}`);
         }

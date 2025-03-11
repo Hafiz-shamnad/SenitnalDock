@@ -12,6 +12,11 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from config import Config
+from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
+from textwrap import fill
 
 
 
@@ -21,6 +26,22 @@ app = Flask(__name__)
 NVD_API_URL = "https://services.nvd.nist.gov/rest/json/cves"
 NVD_API_KEY = os.getenv("NVD_API_KEY")
 
+def ssh_command(command):
+    """Executes an SSH command on the remote server."""
+    try:
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(SSH_HOST, username=SSH_USER, key_filename=os.path.expanduser(SSH_KEY))
+
+        stdin, stdout, stderr = ssh.exec_command(command)
+        output = stdout.read().decode('utf-8').strip()
+        error = stderr.read().decode('utf-8').strip()
+
+        ssh.close()
+        return output if output else None, error if error else None
+
+    except Exception as e:
+        return None, str(e)
 
 def run_trivy_scan(image_name):
     """
@@ -95,37 +116,51 @@ def get_mitigation(cve_id, api_key):
         }
 
 def generate_report(cve_details, output_path):
-    """Generates a PDF report with CVE details."""
+    """Generates a professional CVE report in PDF with proper word wrapping and page handling."""
     try:
-        c = canvas.Canvas(output_path, pagesize=letter)
-        width, height = letter
+        doc = SimpleDocTemplate(output_path, pagesize=letter)
+        styles = getSampleStyleSheet()
+        elements = []
 
-        c.setFont("Helvetica-Bold", 16)
-        c.drawString(30, height - 50, "CVE Report")
-
-        y_position = height - 100
-        c.setFont("Helvetica", 12)
+        # Title
+        title = Paragraph("<b>CVE Security Report</b>", styles["Title"])
+        elements.append(title)
+        elements.append(Spacer(1, 20))
 
         for cve in cve_details:
-            if y_position < 100:
-                c.showPage()
-                y_position = height - 50
-                c.setFont("Helvetica", 12)
+            # Format text properly
+            wrapped_description = fill(cve["Description"], width=80)
+            wrapped_impact = fill(str(cve["Impact Score"]), width=80)  # Convert to string
+            formatted_references = "\n".join(fill(link, width=80) for link in cve["References"].split("\n"))
 
-            c.drawString(30, y_position, f"CVE: {cve['CVE']}")
-            y_position -= 15
-            c.drawString(30, y_position, f"Description: {cve['Description']}")
-            y_position -= 30
-            c.drawString(30, y_position, f"Impact Score: {cve['Impact Score']}")
-            y_position -= 15
-            c.drawString(30, y_position, "References:")
-            y_position -= 15
-            for line in cve['References'].split("\n"):
-                c.drawString(50, y_position, line)
-                y_position -= 15
-            y_position -= 20
+            # Data for the table
+            table_data = [
+                [Paragraph(f"<b>CVE:</b> {cve['CVE']}", styles["Heading2"])],
+                [Paragraph(f"<b>Description:</b> {wrapped_description}", styles["Normal"])],
+                [Paragraph(f"<b>Impact Score:</b> {wrapped_impact}", styles["Normal"])],
+                [Paragraph("<b>References:</b>", styles["Normal"])],
+                [Paragraph(formatted_references, styles["Normal"])]
+            ]
 
-        c.save()
+            # Table setup
+            table = Table(table_data, colWidths=[500])
+            table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 11),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ]))
+
+            elements.append(table)
+            elements.append(Spacer(1, 30))  # Space between entries
+
+        doc.build(elements)
+        print("PDF report generated successfully.")
+
     except Exception as e:
         print(f"Error generating PDF: {e}")
         
@@ -283,3 +318,43 @@ def send_email(user_email, subject, body, html_body=None):
         print("Email sent successfully!")
     except Exception as e:
         print(f"Error: {e}")
+
+# Define backup directory
+BACKUP_DIR = "/home/vboxuser/backup/docker"
+
+def backup_container():
+    """Creates a backup of selected Docker containers on the remote server."""
+    try:
+        # Get container IDs from request
+        data = request.get_json()
+        container_ids = data.get("container_ids", [])
+
+        if not container_ids:
+            return jsonify({"error": "No containers selected for backup"}), 400
+
+        backup_results = []
+
+        for container_id in container_ids:
+            # Commit the container to a new image
+            backup_image_name = f"backup_{container_id}"
+            _, error = ssh_command(f"docker commit -p {container_id} {backup_image_name}")
+            if error:
+                backup_results.append({"container_id": container_id, "error": error})
+                continue
+
+            # Save the image as a tar file
+            backup_file = f"{BACKUP_DIR}/{backup_image_name}.tar"
+            _, error = ssh_command(f"docker save -o {backup_file} {backup_image_name}")
+            print(f"docker save -o {backup_file} {backup_image_name}")
+            if error:
+                backup_results.append({"container_id": container_id, "error": error})
+                continue
+
+            # Append success result
+            backup_results.append({"container_id": container_id, "backup_file": backup_file})
+
+        return jsonify({"success": True, "backups": backup_results})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+

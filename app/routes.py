@@ -1,13 +1,14 @@
 from flask import Blueprint, render_template, jsonify, request , redirect, url_for, session, flash , send_file
-from app.utils import run_trivy_scan, generate_report , get_mitigation , monitor_container , get_running_containers ,fetch_logs , stop_container , restart_container ,send_email
+from app.utils import run_trivy_scan, generate_report , get_mitigation , monitor_container , get_running_containers ,fetch_logs , stop_container , restart_container ,send_email, backup_container
 from flask import Flask, render_template, request, jsonify
 from flask_login import login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import LoginManager
 import random
 import pyotp
+from datetime import datetime
 from flask_login import login_user
-from app.models.user import User, db 
+from app.models.user import User, db, CVEReport
 from flask_sock import Sock
 import os
 
@@ -54,48 +55,63 @@ def scan_image():
         return jsonify(scan_results)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
+    
 @main.route('/generate-report', methods=['POST'])
 def generate_report_route():
     """
-    Handles the /generate-report endpoint to fetch CVE details and generate a PDF report.
+    Handles the /generate-report endpoint to fetch CVE details, generate a PDF report, 
+    and store the report details in the database with a timestamped filename.
     """
-    # Extract CVE list from the request
-    data = request.json
-    cve_list = data.get('cve_list', [])
+    try:
+        # Extract CVE list from the request
+        data = request.json
+        cve_list = data.get('cve_list', [])
 
-    # Check if CVE list is provided
-    if not cve_list:
-        return jsonify({'error': 'No CVE list provided'}), 400
+        if not cve_list:
+            return jsonify({'error': 'No CVE list provided'}), 400
 
-    print("Received CVE List:", cve_list)  # Debugging output to verify input
+        print("Received CVE List:", cve_list)  # Debugging output
 
-    # Prepare a list to store detailed CVE information
-    detailed_cves = []
-    for cve in cve_list:
-        try:
-            # Validate that the CVE entry has the 'CVE' key
+        # Fetch detailed CVE information
+        detailed_cves = []
+        for cve in cve_list:
             cve_id = cve.get('cve_id')
             if not cve_id:
-                print("Skipping invalid CVE entry:", cve)  # Log skipped entries
+                print(f"Skipping invalid CVE entry: {cve}")  # Log skipped entries
                 continue
 
-            # Fetch detailed information for the CVE
-            detailed_cves.append(get_mitigation(cve_id, NVD_API_KEY))
-        except Exception as e:
-            print(f"Error fetching details for CVE {cve}: {e}")  # Log errors
+            try:
+                detailed_cves.append(get_mitigation(cve_id, NVD_API_KEY))
+            except Exception as e:
+                print(f"Error fetching details for CVE {cve_id}: {e}")
 
-    # Check if any CVE details were successfully fetched
-    if not detailed_cves:
-        return jsonify({'error': 'Failed to fetch any CVE details'}), 500
+        if not detailed_cves:
+            return jsonify({'error': 'Failed to fetch any CVE details'}), 500
 
-    # Generate the report PDF
-    output_path = "report.pdf"
-    try:
+        # Generate a unique filename with timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")  # Format: YYYYMMDD_HHMMSS
+        report_dir = "static/reports"
+        os.makedirs(report_dir, exist_ok=True)
+        filename = f"cve_report_{timestamp}.pdf"
+        output_path = os.path.join(report_dir, filename)
+
+        # Generate the report
         generate_report(detailed_cves, output_path)
-        return jsonify({'message': 'Report generated successfully', 'path': output_path})
+
+        # Store the report in the database
+        new_report = CVEReport(filename=filename, file_path=output_path, created_at=datetime.now())
+        db.session.add(new_report)
+        db.session.commit()
+
+        return jsonify({
+            'message': 'Report generated successfully',
+            'report_path': output_path
+        }), 200
+
     except Exception as e:
-        return jsonify({'error': f"Failed to generate report: {e}"}), 500
+        print(f"Error in generate_report_route: {e}")
+        return jsonify({'error': f"Internal Server Error: {str(e)}"}), 500
+
 
 @sock.route("/logs")
 def stream_logs(ws):
@@ -314,6 +330,32 @@ def verify_totp():
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))  
+
+@main.route('/reports')
+def reports():
+    reports = CVEReport.query.order_by(CVEReport.created_at.desc()).all()
+    return render_template('reports.html', reports=reports)
+
+@main.route('/download/<int:report_id>')
+def download_report(report_id):
+    # Fetch the report from the database
+    report = CVEReport.query.get_or_404(report_id)
+    
+    # Ensure the file path is correct
+    file_path = os.path.join("/home/hafiz/SenitnalDock/static/reports", os.path.basename(report.file_path))
+
+    # Check if the file exists before sending it
+    if not os.path.exists(file_path):
+        return abort(404, description="Report not found")
+
+    return send_file(file_path, as_attachment=True)
+
+
+@main.route('/backup', methods=['GET', 'POST'])
+def do_backup_container():
+    if request.method == 'POST' :
+        backup_container()
+    return render_template('backup.html')
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

@@ -3,52 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Docker Monitoring Dashboard</title>
+    <title>Sentinal Dock - Docker Monitoring</title>
     <link rel="stylesheet" href="/static/css/bootstrap.min.css">
     <script src="/static/js/bootstrap.bundle.min.js"></script>
     <link rel="stylesheet" href="/static/css/styles.css">
     <script src="/static/js/scripts.js" defer></script>
-    
 </head>
-<body class="bg-light">
-    <nav class="navbar navbar-dark bg-dark p-3">
-        <a class="navbar-brand mx-3" href="#">Docker Monitoring Dashboard</a>
+<body class="bg-dark text-light">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-black shadow-sm px-3">
+        <a class="navbar-brand fw-bold" href="#">Sentinel Dock</a>
     </nav>
     
     <div class="d-flex">
         <!-- Sidebar -->
-        <div class="bg-dark text-white p-3 vh-100" style="width: 250px;">
-            <h5 class="text-center">Menu</h5>
+        <div class="bg-secondary text-light p-4 vh-100" style="width: 260px;">
+            <h5 class="text-center border-bottom pb-2">Dashboard</h5>
             <ul class="nav flex-column">
-                <li class="nav-item"><a href="#" class="nav-link text-white">Home</a></li>
-                <li class="nav-item"><a href="#stats" class="nav-link text-white">System Stats</a></li>
-                <li class="nav-item"><a href="#admin" class="nav-link text-white">Admin Controls</a></li>
-                <li class="nav-item"><a href="#scan" class="nav-link text-white">Trivy Scan</a></li>
-                <li class="nav-item"><a href="#logs" class="nav-link text-white">System Logs</a></li>
-                <li class="nav-item"><a href="#settings" class="nav-link text-white">Settings</a></li>
+                <li class="nav-item py-2"><a href="#" class="nav-link text-light">Home</a></li>
+                <li class="nav-item py-2"><a href="#stats" class="nav-link text-light">System Stats</a></li>
+                <li class="nav-item py-2"><a href="#scan" class="nav-link text-light">Trivy Scan</a></li>
+                <li class="nav-item py-2"><a href="#logs" class="nav-link text-light">System Logs</a></li>
+                <li class="nav-item py-2"><a href="#settings" class="nav-link text-light">Settings</a></li>
             </ul>
         </div>
         
         <!-- Main Content -->
-        <div class="container mt-4" style="flex-grow: 1;">
+        <div class="container-fluid p-4" style="flex-grow: 1;">
             <div class="row">
                 <div class="col-lg-6">
-                    <div class="card shadow-sm" id="scan">
+                    <div class="card bg-dark text-light border-light shadow-sm" id="scan">
                         <div class="card-body">
                             <h5 class="card-title">Trivy Scan</h5>
                             <div class="mb-3">
                                 <label for="image-name" class="form-label">Docker Image Name</label>
-                                <input type="text" class="form-control" id="image-name" placeholder="Enter image name (e.g., nginx)">
+                                <input type="text" class="form-control bg-dark text-light" id="image-name" placeholder="Enter image name (e.g., nginx)">
                             </div>
                             <button id="scan-image" class="btn btn-primary">Scan Image</button>
                         </div>
                     </div>
                 </div>
                 <div class="col-lg-6">
-                    <div class="card shadow-sm">
+                    <div class="card bg-dark text-light border-light shadow-sm">
                         <div class="card-body">
                             <h5 class="card-title">System Stats</h5>
-                            <div id="stats" class="p-3 bg-light rounded">Loading...</div>
+                            <div id="stats" class="p-3 bg-light text-dark rounded">Loading...</div>
                         </div>
                     </div>
                 </div>
@@ -56,24 +54,22 @@
             
             <div class="row mt-4">
                 <div class="col-lg-6">
-                    <div class="card shadow-sm" id="admin">
+                    <div class="card bg-dark text-light border-light shadow-sm" id="admin">
                         <div class="card-body">
                             <h5 class="card-title">Admin Controls</h5>
                             <div class="d-grid gap-2">
                                 <a href="/stop" class="btn btn-danger">Stop a Container</a>
                                 <a href="/restart" class="btn btn-warning">Restart a Container</a>
-                                <button class="btn btn-success">Backup System</button>
+                                <a href="/backup" class="btn btn-success">Backup System</a>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="col-lg-6">
-                    <div class="card shadow-sm" id="admin">
+                    <div class="card bg-dark text-light border-light shadow-sm">
                         <div class="card-body">
                             <h5 class="card-title">Alert System</h5>
-                            <div id="threshold-container">
-                                <p>Loading running containers...</p>
-                            </div>
+                            <div id="threshold-container" class="p-3">Loading running containers...</div>
                             <button id="set-thresholds" class="btn btn-success mt-3">Set Thresholds</button>
                         </div>
                     </div>
@@ -82,48 +78,48 @@
             
             <div class="row mt-4">
                 <div class="col-12">
-                    <div class="card shadow-sm">
+                    <div class="card bg-dark text-light border-light shadow-sm">
                         <div class="card-body">
                             <h5 class="card-title">Scan Results</h5>
-                            <pre id="scan-output" class="p-3 bg-light rounded">No scan performed yet.</pre>
+                            <pre id="scan-output" class="p-3 bg-light text-dark rounded">No scan performed yet.</pre>
                             <button id="generate-report" class="btn btn-success">Generate CVE Report</button>
+                            <button id="view-reports" class="btn btn-primary" onclick="window.location.href='/reports'">View Reports</button>                            
                         </div>
                     </div>
                 </div>
             </div>
             
-            <div class="row">
+            <div class="row mt-4">
                 <div class="col-md-4">
-                    <div class="card shadow-sm mt-4">
+                    <div class="card bg-dark text-light border-light shadow-sm">
                         <div class="card-body">
                             <h5 class="card-title">Running Containers</h5>
-                    <ul id="container-list" class="list-group">
-                        <li class="list-group-item">Loading...</li>
-                    </ul>
+                            <ul id="container-list" class="list-group bg-dark text-light">
+                                <li class="list-group-item bg-dark text-light">Loading...</li>
+                            </ul>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-8">
-                    <div class="card shadow-sm mt-4">
+                    <div class="card bg-dark text-light border-light shadow-sm">
                         <div class="card-body">
                             <h5 class="card-title">System Logs</h5>
-                            <pre id="system-logs" class="p-3 bg-light rounded">Select a container to view logs.</pre>
+                            <pre id="system-logs" class="p-3 bg-light text-dark rounded">Select a container to view logs.</pre>
                             <button id="refresh-logs" class="btn btn-info">Refresh Logs</button>
                         </div>
                     </div>
                 </div>
             </div>
-            
         </div>
         
         <!-- Right Panel for Alerts -->
-        <div class="bg-light border-start shadow-sm p-3 vh-100 d-flex flex-column" style="width: 300px;">
-                <div class="card shadow-sm">
-                    <div class="card-body">
-                        <h5 class="card-title">Alerts</h5>
-                        <div id="alert-panel" class="p-3 bg-light rounded" style="min-height: 100px;">No alerts</div>
-                    </div>
+        <div class="bg-dark border-start p-3 vh-100 text-light d-flex flex-column" style="width: 300px;">
+            <div class="card bg-dark text-light border-light shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Alerts</h5>
+                    <div id="alert-panel" class="p-3 bg-light text-dark rounded" style="min-height: 100px;">No alerts</div>
                 </div>
+            </div>
             <button class="btn btn-primary mt-auto">View All Alerts</button>
         </div>
     </div>
