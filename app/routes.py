@@ -4,7 +4,6 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sock import Sock
 import os
 import random
-import pyotp
 from datetime import datetime
 from functools import wraps
 from pathlib import Path
@@ -32,6 +31,10 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'main.login'
 
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
 # Helper functions
 def handle_container_action(action_func, container_ids):
     """Generic handler for container operations."""
@@ -50,7 +53,7 @@ def handle_container_action(action_func, container_ids):
             
     return processed, errors
 
-# Routes
+# Basic routes
 @main.route('/')
 def home():
     return redirect(url_for('main.login'))
@@ -59,6 +62,7 @@ def home():
 def dashboard():
     return render_template('dashboard.html')
 
+# Container monitoring and management routes
 @main.route('/monitor', methods=['GET'])
 def get_container_stats():
     return jsonify(monitor_container())
@@ -68,6 +72,72 @@ def list_containers():
     """API to return running containers."""
     return jsonify(get_running_containers()) 
 
+@sock.route("/logs")
+def stream_logs(ws):
+    while True:
+        message = ws.receive()
+        if not message:
+            ws.send("Error: No container specified")
+            continue
+
+        container_name = message.strip()
+        fetch_logs(ws, container_name)
+
+@main.route("/stop_container", methods=["POST"])
+def stop():
+    """Stop selected containers."""
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "Invalid JSON or no JSON provided"}), 400
+
+    stopped_containers, errors = handle_container_action(
+        stop_container, 
+        data.get("container_ids", [])
+    )
+
+    if errors:
+        return jsonify({"error": errors, "stopped_containers": stopped_containers}), 500
+
+    return jsonify({"message": f"Containers {', '.join(stopped_containers)} stopped successfully"}), 200
+
+@main.route("/restart_container", methods=["POST"])
+def restart():
+    """Restart selected containers."""
+    data = request.get_json(silent=True)
+    
+    if not data:
+        return jsonify({"error": "Invalid JSON or no JSON provided"}), 400
+
+    restarted_containers, errors = handle_container_action(
+        restart_container,
+        data.get("container_ids", [])
+    )
+
+    response = {
+        "restarted_containers": restarted_containers,
+        "errors": errors
+    }
+
+    status_code = 200 if not errors else 207  # 207: Multi-Status
+    return jsonify(response), status_code
+
+@main.route("/stop", methods=["GET"])
+def stop_page():
+    """Render the container stopping page."""
+    return render_template("stop_container.html")
+
+@main.route("/restart", methods=["GET"])
+def restart_page():
+    """Render the container restart page."""
+    return render_template("restart_container.html")
+
+@main.route('/backup', methods=['GET', 'POST'])
+def do_backup_container():
+    if request.method == 'POST':
+        backup_container()
+    return render_template('backup.html')
+
+# Security scanning and reporting routes
 @main.route('/scan', methods=['POST'])
 def scan_image():
     data = request.json
@@ -81,7 +151,7 @@ def scan_image():
         return jsonify(scan_results)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    
+
 @main.route('/generate-report', methods=['POST'])
 def generate_report_route():
     """
@@ -132,65 +202,26 @@ def generate_report_route():
     except Exception as e:
         return jsonify({'error': f"Internal Server Error: {str(e)}"}), 500
 
-@sock.route("/logs")
-def stream_logs(ws):
-    while True:
-        message = ws.receive()  # ✅ WebSocket clients should send data
-        if not message:
-            ws.send("Error: No container specified")
-            continue
+@main.route('/reports')
+def reports():
+    reports = CVEReport.query.order_by(CVEReport.created_at.desc()).all()
+    return render_template('reports.html', reports=reports)
 
-        container_name = message.strip()
-        fetch_logs(ws, container_name)
-        
-@main.route("/stop_container", methods=["POST"])
-def stop():
-    """Stop selected containers."""
-    data = request.get_json(silent=True)
-    if not data:
-        return jsonify({"error": "Invalid JSON or no JSON provided"}), 400
-
-    stopped_containers, errors = handle_container_action(
-        stop_container, 
-        data.get("container_ids", [])
-    )
-
-    if errors:
-        return jsonify({"error": errors, "stopped_containers": stopped_containers}), 500
-
-    return jsonify({"message": f"Containers {', '.join(stopped_containers)} stopped successfully"}), 200
-
-@main.route("/restart_container", methods=["POST"])
-def restart():
-    """Restart selected containers."""
-    data = request.get_json(silent=True)
+@main.route('/download/<int:report_id>')
+def download_report(report_id):
+    # Fetch the report from the database
+    report = CVEReport.query.get_or_404(report_id)
     
-    if not data:
-        return jsonify({"error": "Invalid JSON or no JSON provided"}), 400
+    # Ensure the file path is correct
+    file_path = os.path.join("/home/hafiz/SenitnalDock/static/reports", os.path.basename(report.file_path))
 
-    restarted_containers, errors = handle_container_action(
-        restart_container,
-        data.get("container_ids", [])
-    )
+    # Check if the file exists before sending it
+    if not os.path.exists(file_path):
+        abort(404, description="Report not found")
 
-    response = {
-        "restarted_containers": restarted_containers,
-        "errors": errors
-    }
+    return send_file(file_path, as_attachment=True)
 
-    status_code = 200 if not errors else 207  # 207: Multi-Status
-    return jsonify(response), status_code
-
-@main.route("/stop", methods=["GET"])
-def stop_page():
-    """Render the container stopping page."""
-    return render_template("stop_container.html")
-
-@main.route("/restart", methods=["GET"])
-def restart_page():
-    """Render the container stopping page."""
-    return render_template("restart_container.html")
-
+# User authentication and management routes
 @main.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
@@ -215,48 +246,51 @@ def login():
         username = request.form['username']
         password = request.form['password']
         user = User.query.filter_by(username=username).first()
-
+        
         if user and check_password_hash(user.password, password):
             # Generate a random 6-digit OTP
             otp = str(random.randint(100000, 999999))
             user.otp = otp
             db.session.commit()
-
-            # Send OTP via email
+            
+            # Send OTP via email with SentinalDock theming
             email_html = f"""
             <html>
-                <body style="font-family: Arial, sans-serif; line-height: 1.6;">
-                    <h2 style="color: #2C3E50;">Your One-Time Password (OTP)</h2>
-                    <p>Dear {user.username},</p>
-                    <p>We received a login request for your account. To proceed, please use the following OTP:</p>
-                    <h3 style="color: #27AE60; font-size: 24px;">{otp}</h3>
-                    <p>This OTP is valid for <strong>10 minutes</strong>. Please do not share it with anyone.</p>
-                    <p>If you did not attempt to log in, please ignore this email or contact support immediately.</p>
-                    <hr>
-                    <p style="font-size: 14px; color: #7F8C8D;">Best regards,<br><strong>Team SentinalDock</strong></p>
+                <body style="font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; background-color: #f9f9f9; padding: 20px; color: #333;">
+                    <div style="max-width: 600px; margin: 0 auto; background-color: #fff; border-radius: 10px; padding: 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                        <div style="border-left: 4px solid #0078d4; padding-left: 15px; margin-bottom: 20px;">
+                            <h2 style="color: #0078d4; margin: 0;">Security Authentication Required</h2>
+                        </div>
+                        <p>Hello {user.username},</p>
+                        <p>A login attempt was detected for your SentinalDock account. To verify your identity, please use the following one-time password:</p>
+                        <div style="background-color: #f0f8ff; border-radius: 5px; padding: 15px; text-align: center; margin: 20px 0;">
+                            <h3 style="color: #0078d4; font-size: 28px; letter-spacing: 5px; margin: 0;">{otp}</h3>
+                        </div>
+                        <p>This code will expire in <strong>5 minutes</strong>.</p>
+                        <p>If you did not attempt to log in, please secure your account immediately and contact our security team.</p>
+                        <hr style="border: none; border-top: 1px solid #eaeaea; margin: 25px 0;">
+                        <p style="font-size: 14px; color: #666; text-align: center;">
+                            &copy; 2025 SentinalDock - Container Security Management System<br>
+                            <span style="color: #0078d4;">Protecting your containers. Securing your infrastructure.</span>
+                        </p>
+                    </div>
                 </body>
             </html>
             """
             
             send_email(
                 user.email,
-                "🔒 Secure Login OTP - Action Required",
-                body=f"Your OTP is: {otp}. Please use it within 10 minutes.",
+                "🔒 SentinalDock Security Verification Code",
+                body=f"Your SentinalDock verification code is: {otp}. Valid for 5 minutes.",
                 html_body=email_html
             )
-
+            
             session['username'] = username  # Store user session
-            flash('OTP sent to your email. Please verify.', 'info')
+            flash('Security code sent to your email. Please verify to continue.', 'info')
             return redirect(url_for('main.verify_otp'))
-
-        flash('Invalid username or password', 'danger')
+            
+        flash('Invalid credentials detected. Please try again.', 'danger')
     return render_template('login.html')
-
-@main.route('/logout')
-@login_required
-def logout():
-    logout_user()
-    return redirect(url_for('main.login'))
 
 @main.route('/verify-otp', methods=['GET', 'POST'])
 def verify_otp():
@@ -279,7 +313,7 @@ def verify_otp():
             return redirect(url_for("main.login"))
 
         if str(user.otp) == str(otp):  # Ensure type consistency
-            load_user(user.id)  # Pass only the user ID
+            load_user(user.id)  # Use login_user instead of load_user
             user.otp = None  # Clear OTP after successful verification
             db.session.commit()
             return redirect(url_for('main.dashboard'))
@@ -288,60 +322,9 @@ def verify_otp():
 
     return render_template('verify_otp.html')
 
-@main.route('/setup-2fa')
-def setup_2fa():
-    user = User.query.filter_by(username=session.get('username')).first()
-
-    if not user.otp_secret:
-        user.otp_secret = pyotp.random_base32()
-        db.session.commit()
-
-    totp = pyotp.TOTP(user.otp_secret)
-    qr_code_url = totp.provisioning_uri(user.email, issuer_name="FlaskApp")
-
-    return render_template('setup_2fa.html', qr_url=qr_code_url)
-
-@main.route('/verify-totp', methods=['POST'])
-def verify_totp():
-    otp = request.form['otp']
-    user = User.query.filter_by(username=session.get('username')).first()
-    
-    totp = pyotp.TOTP(user.otp_secret)
-    if totp.verify(otp):
-        login_user(user)
-        return redirect(url_for('main.dashboard'))
-    
-    flash('Invalid TOTP', 'danger')
-    return redirect(url_for('main.setup_2fa'))
-
-@login_manager.user_loader
-def load_user(user_id):
-    return User.query.get(int(user_id))  
-
-@main.route('/reports')
-def reports():
-    reports = CVEReport.query.order_by(CVEReport.created_at.desc()).all()
-    return render_template('reports.html', reports=reports)
-
-@main.route('/download/<int:report_id>')
-def download_report(report_id):
-    # Fetch the report from the database
-    report = CVEReport.query.get_or_404(report_id)
-    
-    # Ensure the file path is correct
-    file_path = os.path.join("/home/hafiz/SenitnalDock/static/reports", os.path.basename(report.file_path))
-
-    # Check if the file exists before sending it
-    if not os.path.exists(file_path):
-        abort(404, description="Report not found")
-
-    return send_file(file_path, as_attachment=True)
-
-@main.route('/backup', methods=['GET', 'POST'])
-def do_backup_container():
-    if request.method == 'POST':
-        backup_container()
-    return render_template('backup.html')
+@main.route('/logout')
+def logout():
+    return redirect(url_for('main.login'))
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
