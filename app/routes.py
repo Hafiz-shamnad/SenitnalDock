@@ -1,29 +1,56 @@
-from flask import Blueprint, render_template, jsonify, request , redirect, url_for, session, flash , send_file
-from app.utils import run_trivy_scan, generate_report , get_mitigation , monitor_container , get_running_containers ,fetch_logs , stop_container , restart_container ,send_email, backup_container
-from flask import Flask, render_template, request, jsonify
-from flask_login import login_user, login_required, logout_user, current_user
+from flask import Blueprint, Flask, render_template, jsonify, request, redirect, url_for, session, flash, send_file, abort
+from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from flask_login import LoginManager
+from flask_sock import Sock
+import os
 import random
 import pyotp
 from datetime import datetime
-from flask_login import login_user
-from app.models.user import User, db, CVEReport
-from flask_sock import Sock
-import os
+from functools import wraps
+from pathlib import Path
 
+from app.models.user import User, db, CVEReport
+from app.utils import (
+    run_trivy_scan, generate_report, get_mitigation, 
+    monitor_container, get_running_containers, fetch_logs, 
+    stop_container, restart_container, send_email, backup_container
+)
+
+# Initialize Flask app
 app = Flask(__name__, static_url_path='', static_folder='static')
 main = Blueprint('main', __name__)
 sock = Sock()
-
 sock.init_app(main)
 
+# Configuration
 NVD_API_KEY = os.getenv("NVD_API_KEY")
+REPORT_DIR = Path("static/reports")
+REPORT_DIR.mkdir(exist_ok=True)
+
+# Setup login manager
 login_manager = LoginManager()
-login_manager.init_app(app)  # Attach it to the Flask app
-login_manager.login_view = 'main.login'  # Redirect to login page if unauthorized
+login_manager.init_app(app)
+login_manager.login_view = 'main.login'
 
+# Helper functions
+def handle_container_action(action_func, container_ids):
+    """Generic handler for container operations."""
+    if not container_ids or not isinstance(container_ids, list):
+        return jsonify({"error": "Container IDs are required and must be a list"}), 400
+        
+    processed = []
+    errors = []
+    
+    for container_id in container_ids:
+        try:
+            action_func(container_id)
+            processed.append(container_id)
+        except Exception as e:
+            errors.append(f"Failed to process {container_id}: {str(e)}")
+            
+    return processed, errors
 
+# Routes
 @main.route('/')
 def home():
     return redirect(url_for('main.login'))
@@ -34,8 +61,7 @@ def dashboard():
 
 @main.route('/monitor', methods=['GET'])
 def get_container_stats():
-    data = monitor_container()
-    return jsonify(data)
+    return jsonify(monitor_container())
 
 @main.route('/containers', methods=['GET'])
 def list_containers():
@@ -70,14 +96,11 @@ def generate_report_route():
         if not cve_list:
             return jsonify({'error': 'No CVE list provided'}), 400
 
-        print("Received CVE List:", cve_list)  # Debugging output
-
         # Fetch detailed CVE information
         detailed_cves = []
         for cve in cve_list:
             cve_id = cve.get('cve_id')
             if not cve_id:
-                print(f"Skipping invalid CVE entry: {cve}")  # Log skipped entries
                 continue
 
             try:
@@ -89,29 +112,25 @@ def generate_report_route():
             return jsonify({'error': 'Failed to fetch any CVE details'}), 500
 
         # Generate a unique filename with timestamp
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")  # Format: YYYYMMDD_HHMMSS
-        report_dir = "static/reports"
-        os.makedirs(report_dir, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"cve_report_{timestamp}.pdf"
-        output_path = os.path.join(report_dir, filename)
+        output_path = REPORT_DIR / filename
 
         # Generate the report
-        generate_report(detailed_cves, output_path)
+        generate_report(detailed_cves, str(output_path))
 
         # Store the report in the database
-        new_report = CVEReport(filename=filename, file_path=output_path, created_at=datetime.now())
+        new_report = CVEReport(filename=filename, file_path=str(output_path), created_at=datetime.now())
         db.session.add(new_report)
         db.session.commit()
 
         return jsonify({
             'message': 'Report generated successfully',
-            'report_path': output_path
+            'report_path': str(output_path)
         }), 200
 
     except Exception as e:
-        print(f"Error in generate_report_route: {e}")
         return jsonify({'error': f"Internal Server Error: {str(e)}"}), 500
-
 
 @sock.route("/logs")
 def stream_logs(ws):
@@ -121,10 +140,8 @@ def stream_logs(ws):
             ws.send("Error: No container specified")
             continue
 
-        # Assuming message is the container name
         container_name = message.strip()
-
-        fetch_logs(ws, container_name)  # Your log function
+        fetch_logs(ws, container_name)
         
 @main.route("/stop_container", methods=["POST"])
 def stop():
@@ -133,19 +150,10 @@ def stop():
     if not data:
         return jsonify({"error": "Invalid JSON or no JSON provided"}), 400
 
-    container_ids = data.get("container_ids")  # Match frontend key
-    if not container_ids or not isinstance(container_ids, list):
-        return jsonify({"error": "Container IDs are required and must be a list"}), 400
-
-    stopped_containers = []
-    errors = []
-
-    for container_id in container_ids:
-        try:
-            stop_container(container_id)
-            stopped_containers.append(container_id)
-        except Exception as e:
-            errors.append(f"Failed to stop {container_id}: {str(e)}")
+    stopped_containers, errors = handle_container_action(
+        stop_container, 
+        data.get("container_ids", [])
+    )
 
     if errors:
         return jsonify({"error": errors, "stopped_containers": stopped_containers}), 500
@@ -160,29 +168,18 @@ def restart():
     if not data:
         return jsonify({"error": "Invalid JSON or no JSON provided"}), 400
 
-    container_ids = data.get("container_ids")  # Match frontend key
-    if not container_ids or not isinstance(container_ids, list):
-        return jsonify({"error": "Container IDs are required and must be a list"}), 400
-
-    restarted_containers = []
-    errors = []
-
-    for container_id in container_ids:
-        try:
-            restart_container(container_id)
-            restarted_containers.append(container_id)
-        except Exception as e:
-            errors.append(f"Failed to restart {container_id}: {str(e)}")
+    restarted_containers, errors = handle_container_action(
+        restart_container,
+        data.get("container_ids", [])
+    )
 
     response = {
         "restarted_containers": restarted_containers,
         "errors": errors
     }
 
-    status_code = 200 if not errors else 207  # 207: Multi-Status (some succeeded, some failed)
+    status_code = 200 if not errors else 207  # 207: Multi-Status
     return jsonify(response), status_code
-
-
 
 @main.route("/stop", methods=["GET"])
 def stop_page():
@@ -193,9 +190,6 @@ def stop_page():
 def restart_page():
     """Render the container stopping page."""
     return render_template("restart_container.html")
-
-
-
 
 @main.route('/register', methods=['GET', 'POST'])
 def register():
@@ -229,26 +223,27 @@ def login():
             db.session.commit()
 
             # Send OTP via email
+            email_html = f"""
+            <html>
+                <body style="font-family: Arial, sans-serif; line-height: 1.6;">
+                    <h2 style="color: #2C3E50;">Your One-Time Password (OTP)</h2>
+                    <p>Dear {user.username},</p>
+                    <p>We received a login request for your account. To proceed, please use the following OTP:</p>
+                    <h3 style="color: #27AE60; font-size: 24px;">{otp}</h3>
+                    <p>This OTP is valid for <strong>10 minutes</strong>. Please do not share it with anyone.</p>
+                    <p>If you did not attempt to log in, please ignore this email or contact support immediately.</p>
+                    <hr>
+                    <p style="font-size: 14px; color: #7F8C8D;">Best regards,<br><strong>Team SentinalDock</strong></p>
+                </body>
+            </html>
+            """
+            
             send_email(
-    user.email,
-    "🔒 Secure Login OTP - Action Required",
-    body=f"Your OTP is: {otp}. Please use it within 10 minutes.",
-    html_body=f"""
-    <html>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6;">
-            <h2 style="color: #2C3E50;">Your One-Time Password (OTP)</h2>
-            <p>Dear {user.username},</p>
-            <p>We received a login request for your account. To proceed, please use the following OTP:</p>
-            <h3 style="color: #27AE60; font-size: 24px;">{otp}</h3>
-            <p>This OTP is valid for <strong>10 minutes</strong>. Please do not share it with anyone.</p>
-            <p>If you did not attempt to log in, please ignore this email or contact support immediately.</p>
-            <hr>
-            <p style="font-size: 14px; color: #7F8C8D;">Best regards,<br><strong>Team SentinalDock</strong></p>
-        </body>
-    </html>
-    """
-)
-
+                user.email,
+                "🔒 Secure Login OTP - Action Required",
+                body=f"Your OTP is: {otp}. Please use it within 10 minutes.",
+                html_body=email_html
+            )
 
             session['username'] = username  # Store user session
             flash('OTP sent to your email. Please verify.', 'info')
@@ -262,8 +257,6 @@ def login():
 def logout():
     logout_user()
     return redirect(url_for('main.login'))
-
-
 
 @main.route('/verify-otp', methods=['GET', 'POST'])
 def verify_otp():
@@ -285,8 +278,6 @@ def verify_otp():
             flash("No OTP found. Request a new one.", "danger")
             return redirect(url_for("main.login"))
 
-        print(f"Stored OTP: {user.otp} (Type: {type(user.otp)}), Entered OTP: {otp} (Type: {type(otp)})")  # Debugging line
-
         if str(user.otp) == str(otp):  # Ensure type consistency
             load_user(user.id)  # Pass only the user ID
             user.otp = None  # Clear OTP after successful verification
@@ -296,9 +287,6 @@ def verify_otp():
         flash('Invalid OTP', 'danger')
 
     return render_template('verify_otp.html')
-
-
-
 
 @main.route('/setup-2fa')
 def setup_2fa():
@@ -326,7 +314,6 @@ def verify_totp():
     flash('Invalid TOTP', 'danger')
     return redirect(url_for('main.setup_2fa'))
 
-
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))  
@@ -346,14 +333,13 @@ def download_report(report_id):
 
     # Check if the file exists before sending it
     if not os.path.exists(file_path):
-        return abort(404, description="Report not found")
+        abort(404, description="Report not found")
 
     return send_file(file_path, as_attachment=True)
 
-
 @main.route('/backup', methods=['GET', 'POST'])
 def do_backup_container():
-    if request.method == 'POST' :
+    if request.method == 'POST':
         backup_container()
     return render_template('backup.html')
 

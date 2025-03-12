@@ -8,13 +8,8 @@ class Config:
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    # Mail Configuration (Now uses environment variables)
-    # MAIL_SERVER = 'smtp-relay.brevo.com'
-    # MAIL_PORT = 587
-    # MAIL_USE_TLS = True
-    # MAIL_USERNAME = os.getenv("MAIL_USERNAME", "default_email@gmail.com")
-    MAIL_PASSWORD = ""
-    MAIL_DEFAULT_SENDER = ""
+    MAIL_PASSWORD = "wupkgzsdboxdcswl"
+    MAIL_DEFAULT_SENDER = "connectme.hafiz@gmail.com"
 
     # Security & API Keys
     SECURITY_PASSWORD_HASH = "pbkdf2_sha512"
