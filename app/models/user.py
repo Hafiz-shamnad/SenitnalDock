@@ -17,3 +17,4 @@ class CVEReport(db.Model):
     filename = db.Column(db.String(255), nullable=False)
     file_path = db.Column(db.String(512), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)  # Keep only this timestamp
+    

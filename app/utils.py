@@ -3,10 +3,7 @@ import json
 import os , re
 import paramiko
 import requests
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
-from fpdf import FPDF
-from flask import Flask
+from flask import Flask , request
 from flask import Flask, jsonify 
 import smtplib
 from email.mime.text import MIMEText
@@ -15,8 +12,9 @@ from config import Config
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from textwrap import fill
+import datetime
 
 
 
@@ -117,52 +115,122 @@ def get_mitigation(cve_id, api_key):
 
 def generate_report(cve_details, output_path):
     """Generates a professional CVE report in PDF with proper word wrapping and page handling."""
+
     try:
+        # Create custom colors for sentinel/dark theme
+        sentinel_dark = colors.Color(0.10, 0.12, 0.16)  # Dark blue-gray background
+        sentinel_header = colors.Color(0.15, 0.18, 0.24)  # Slightly lighter for headers
+        sentinel_text = colors.Color(0.90, 0.90, 0.95)  # Light gray text
+        sentinel_critical = colors.Color(0.90, 0.22, 0.27)  # Red for critical items
+        sentinel_high = colors.Color(0.95, 0.55, 0.20)  # Orange for high risk
+        
+        # Document setup
         doc = SimpleDocTemplate(output_path, pagesize=letter)
+        
+        # Custom styles
         styles = getSampleStyleSheet()
+        styles.add(ParagraphStyle(
+            name='TitleCustom',
+            parent=styles['Title'],
+            textColor=sentinel_dark
+        ))
+        
+        styles.add(ParagraphStyle(
+            name='HeadingCustom',
+            parent=styles['Heading2'],
+            textColor=sentinel_text
+        ))
+        
+        styles.add(ParagraphStyle(
+            name='NormalCustom',
+            parent=styles['Normal'],
+            textColor=sentinel_text
+        ))
+        
+        # Get current time
+        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        # Elements list
         elements = []
-
-        # Title
-        title = Paragraph("<b>CVE Security Report</b>", styles["Title"])
+        
+        # Title with generation info
+        title = Paragraph(f"<b>CVE Security Report</b>", styles["TitleCustom"])
         elements.append(title)
+        
+        # Add generation metadata
+        metadata = Paragraph(f"Generated: {current_time}", styles["NormalCustom"])
+        elements.append(metadata)
         elements.append(Spacer(1, 20))
-
+        
         for cve in cve_details:
+            # Determine risk level for color coding
+            score = 0
+            try:
+                score = float(cve["Impact Score"])
+            except (ValueError, TypeError):
+                pass
+                
             # Format text properly
             wrapped_description = fill(cve["Description"], width=80)
-            wrapped_impact = fill(str(cve["Impact Score"]), width=80)  # Convert to string
+            wrapped_impact = fill(str(cve["Impact Score"]), width=80)
             formatted_references = "\n".join(fill(link, width=80) for link in cve["References"].split("\n"))
-
+            
             # Data for the table
             table_data = [
-                [Paragraph(f"<b>CVE:</b> {cve['CVE']}", styles["Heading2"])],
-                [Paragraph(f"<b>Description:</b> {wrapped_description}", styles["Normal"])],
-                [Paragraph(f"<b>Impact Score:</b> {wrapped_impact}", styles["Normal"])],
-                [Paragraph("<b>References:</b>", styles["Normal"])],
-                [Paragraph(formatted_references, styles["Normal"])]
+                [Paragraph(f"<b>CVE:</b> {cve['CVE']}", styles["HeadingCustom"])],
+                [Paragraph(f"<b>Description:</b> {wrapped_description}", styles["NormalCustom"])],
+                [Paragraph(f"<b>Impact Score:</b> {wrapped_impact}", styles["NormalCustom"])],
+                [Paragraph("<b>References:</b>", styles["NormalCustom"])],
+                [Paragraph(formatted_references, styles["NormalCustom"])]
             ]
-
-            # Table setup
+            
+            # Determine background color based on risk
+            risk_color = sentinel_dark
+            if score >= 7.0:
+                risk_color = sentinel_critical
+            elif score >= 4.0:
+                risk_color = sentinel_high
+            
+            # Table setup with sentinel theme
             table = Table(table_data, colWidths=[500])
             table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('BACKGROUND', (0, 0), (-1, 0), sentinel_header),  # Header row
+                ('TEXTCOLOR', (0, 0), (-1, 0), sentinel_text),
                 ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                 ('FONTSIZE', (0, 0), (-1, -1), 11),
                 ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+                ('BACKGROUND', (0, 1), (-1, -1), sentinel_dark),  # Content rows
+                ('TEXTCOLOR', (0, 1), (-1, -1), sentinel_text),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.gray),
             ]))
-
+            
+            # For high risk items, add a special row at the top
+            if score >= 7.0:
+                risk_text = "HIGH RISK" if score >= 7.0 and score < 9.0 else "CRITICAL RISK"
+                risk_data = [[Paragraph(f"<b>{risk_text}</b>", styles["HeadingCustom"])]]
+                risk_table = Table(risk_data, colWidths=[500])
+                risk_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (0, 0), risk_color),
+                    ('TEXTCOLOR', (0, 0), (0, 0), sentinel_text),
+                    ('ALIGN', (0, 0), (0, 0), 'CENTER'),
+                    ('FONTNAME', (0, 0), (0, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (0, 0), 14),
+                    ('BOTTOMPADDING', (0, 0), (0, 0), 8),
+                    ('TOPPADDING', (0, 0), (0, 0), 8),
+                ]))
+                elements.append(risk_table)
+                
             elements.append(table)
             elements.append(Spacer(1, 30))  # Space between entries
-
+            
         doc.build(elements)
         print("PDF report generated successfully.")
-
+        
     except Exception as e:
         print(f"Error generating PDF: {e}")
+        raise
+
         
 # --- System and Container Monitoring ---
 SSH_HOST = "10.0.2.9"
@@ -357,4 +425,3 @@ def backup_container():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
