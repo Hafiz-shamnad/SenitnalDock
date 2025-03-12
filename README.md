@@ -1,5 +1,3 @@
-# ![Sentinel Dock](assets/logo.png)
-
 ## Sentinel Dock 🚀  
 
 A **powerful container security toolkit** designed to **secure Docker environments** with real-time monitoring, vulnerability scanning, and container security enhancements.
