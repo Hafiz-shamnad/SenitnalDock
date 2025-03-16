@@ -64,7 +64,7 @@ python app.py
 - **Real-time Monitoring:** Navigate to the **Dashboard** to track live container stats.
 - **Security Reports:** View and download detailed PDF reports containing vulnerability data and mitigation strategies.
 
-![Security Report](assets/report.png)
+![Security Report](assets/CVE-Report.png)
 
 ---
 
